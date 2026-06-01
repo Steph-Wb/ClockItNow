@@ -1,0 +1,151 @@
+import { Clock, DollarSign, TrendingUp, Pencil } from 'lucide-react';
+import { differenceInDays, parseISO } from 'date-fns';
+import { formatDuration } from '../../utils/formatDuration';
+import { formatCurrency } from '../../utils/formatCurrency';
+
+type GoalPeriod = 'day' | 'week' | 'month';
+interface Goal { amount: number; period: GoalPeriod; }
+
+interface Props {
+  totalSeconds: number;
+  billableAmount: number;
+  billableSeconds: number;
+  billablePercent: number;
+  goal?: Goal | null;
+  periodFrom?: string;
+  periodTo?: string;
+  onEditGoal?: () => void;
+}
+
+const PERIOD_LABEL: Record<GoalPeriod, string> = {
+  day: 'Tag', week: 'Woche', month: 'Monat',
+};
+const PERIOD_DAYS: Record<GoalPeriod, number> = {
+  day: 1, week: 7, month: 30.44,
+};
+
+function getScaledTarget(goal: Goal, from: string, to: string): number {
+  const days = differenceInDays(parseISO(to), parseISO(from)) + 1;
+  return goal.amount * (days / PERIOD_DAYS[goal.period]);
+}
+
+function fmtNum(n: number): string {
+  return new Intl.NumberFormat('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+
+export default function KpiCards({
+  totalSeconds, billableAmount, billableSeconds, billablePercent,
+  goal, periodFrom, periodTo, onEditGoal,
+}: Props) {
+
+  // Zielumsatz-Berechnungen
+  const scaledTarget = goal && periodFrom && periodTo
+    ? getScaledTarget(goal, periodFrom, periodTo)
+    : null;
+  const achievement = scaledTarget ? billableAmount / scaledTarget : null;
+  const diff = scaledTarget !== null ? billableAmount - scaledTarget : null;
+  // Gewichtetes Mittel: nur Stunden mit Stundensatz > 0 (= billableSeconds)
+  const avgRate = billableSeconds > 0 ? billableAmount / (billableSeconds / 3600) : 0;
+  const hoursNeeded = diff !== null && diff < 0 && avgRate > 0
+    ? Math.abs(diff) / avgRate
+    : null;
+
+  // Farbe Fortschrittsbalken
+  const barColor = achievement === null ? '' :
+    achievement >= 1 ? 'bg-success' :
+    achievement >= 0.7 ? 'bg-amber-400' : 'bg-danger';
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+
+      {/* Gesamtzeit */}
+      <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-4">
+        <div className="text-accent bg-white/5 rounded-lg p-2.5">
+          <Clock size={22} />
+        </div>
+        <div>
+          <p className="text-xs text-secondary mb-0.5">Gesamtzeit</p>
+          <p className="text-xl font-semibold text-accent font-mono tabular-nums">
+            {formatDuration(totalSeconds)}
+          </p>
+        </div>
+      </div>
+
+      {/* Abrechnungsbetrag – mit Zielumsatz */}
+      <div className="bg-card border border-border rounded-xl p-5 flex items-start gap-4">
+        <div className="text-success bg-white/5 rounded-lg p-2.5 flex-shrink-0 mt-0.5">
+          <DollarSign size={22} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-0.5">
+            <p className="text-xs text-secondary">Abrechnungsbetrag</p>
+            <button
+              onClick={onEditGoal}
+              title={goal ? 'Zielumsatz bearbeiten' : 'Zielumsatz festlegen'}
+              className="p-1 rounded text-secondary/40 hover:text-secondary transition-colors"
+            >
+              <Pencil size={11} />
+            </button>
+          </div>
+
+          {/* Betrag mit Hover-Tooltip */}
+          <div className="relative group">
+            <p className="text-xl font-semibold text-success font-mono tabular-nums">
+              {formatCurrency(billableAmount)}
+            </p>
+
+            {/* Ziel darunter */}
+            {scaledTarget !== null && (
+              <p className="text-xs text-secondary mt-0.5">
+                Ziel: CHF {fmtNum(scaledTarget)}
+                <span className="text-secondary/50 ml-1">/{PERIOD_LABEL[goal!.period]}</span>
+              </p>
+            )}
+
+            {/* Tooltip */}
+            {scaledTarget !== null && achievement !== null && diff !== null && (
+              <div className="absolute left-0 top-full mt-2 z-50 bg-sidebar border border-border rounded-lg p-3 text-xs hidden group-hover:block w-56 shadow-xl pointer-events-none">
+                <p className="font-semibold text-primary mb-1.5">
+                  {Math.round(achievement * 100)}% des Ziels erreicht
+                </p>
+                <p className="text-secondary">
+                  {diff >= 0
+                    ? <span className="text-success">CHF {fmtNum(diff)} übertroffen ✓</span>
+                    : `CHF ${fmtNum(Math.abs(diff))} fehlen noch`}
+                </p>
+                {hoursNeeded !== null && (
+                  <p className="text-secondary mt-1">
+                    ~{hoursNeeded.toFixed(1)}h bei Ø CHF {fmtNum(avgRate)}/h
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Fortschrittsbalken */}
+          {scaledTarget !== null && achievement !== null && (
+            <div className="mt-2 h-1 bg-white/10 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${barColor}`}
+                style={{ width: `${Math.min(achievement * 100, 100)}%` }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Abrechenbarkeit */}
+      <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-4">
+        <div className="text-amber-400 bg-white/5 rounded-lg p-2.5">
+          <TrendingUp size={22} />
+        </div>
+        <div>
+          <p className="text-xs text-secondary mb-0.5">Abrechenbarkeit</p>
+          <p className="text-xl font-semibold text-amber-400 font-mono tabular-nums">
+            {billablePercent}%
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

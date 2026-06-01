@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-primary;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  * {
+    @apply border-border;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-secondary/50; }
+}
+
+@layer utilities {
+  .hover\:bg-white\/3:hover { background-color: rgba(255,255,255,0.03); }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+}

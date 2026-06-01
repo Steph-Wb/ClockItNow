@@ -1,0 +1,28 @@
+# Abhängigkeiten
+node_modules/
+
+# Lokale Datenbank (enthält echte Nutzerdaten – niemals committen)
+*.db
+*.db-shm
+*.db-wal
+
+# Umgebungsvariablen (enthält Secrets wie JWT_SECRET, SMTP-Passwörter)
+.env
+.env.local
+
+# Build-Ausgabe
+dist/
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+
+# Claude – lokale Einstellungen (enthält benutzerspezifische Pfade und Berechtigungen)
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
