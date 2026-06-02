@@ -22,15 +22,15 @@ function loadEntries(userId: number, from: string, to: string, clientId: number)
 }
 
 router.get('/', async (req: Request, res: Response) => {
-  const { from, to, clientId, projektText, rapportNr } = req.query;
+  const { from, to, clientId, projektText, rapportNr, lang } = req.query;
   if (!from || !to || !clientId) {
-    return res.status(400).json({ error: 'from, to und clientId sind erforderlich' });
+    return res.status(400).json({ error: 'errors.arbeitsrapport.paramsRequired' });
   }
   const userId = uid(req);
 
   const client = db.prepare('SELECT name, street, zip_city, rapport_postfix, rapport_description FROM clients WHERE id = ? AND user_id = ?')
     .get(Number(clientId), userId) as any;
-  if (!client) return res.status(404).json({ error: 'Kunde nicht gefunden' });
+  if (!client) return res.status(404).json({ error: 'errors.arbeitsrapport.clientNotFound' });
 
   const settings = db.prepare('SELECT sender_name, sender_address, signature_png FROM app_settings WHERE user_id = ?')
     .get(userId) as any ?? {};
@@ -54,6 +54,7 @@ router.get('/', async (req: Request, res: Response) => {
     projektText: (projektText as string) || client.rapport_description || '',
     rapportNr: nr,
     datum,
+    lang: (lang === 'en' ? 'en' : 'de'),
   });
 
   const buffer = await wb.xlsx.writeBuffer();

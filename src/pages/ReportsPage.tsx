@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Download, Printer, Upload, FileSpreadsheet } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import ImportModal from '../components/Import/ImportModal';
 import ArbeitsrapportModal from '../components/Reports/ArbeitsrapportModal';
 import { format } from 'date-fns';
@@ -14,6 +15,7 @@ import { formatDate, formatTime } from '../utils/dateLocale';
 import type { Client, Project, ReportEntry } from '../types';
 
 export default function ReportsPage() {
+  const { t } = useTranslation();
   const today = format(new Date(), 'yyyy-MM-dd');
   const firstOfMonth = format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd');
 
@@ -35,7 +37,7 @@ export default function ReportsPage() {
   const { data: clients } = useApi<Client[]>(() => getClients(), []);
   const { data: projects } = useApi<Project[]>(() => getProjects(), []);
 
-  const search = () => setTrigger(t => t + 1);
+  const search = () => setTrigger(tr => tr + 1);
 
   const toggleClient = (id: number) => setSelectedClients(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const toggleProject = (id: number) => setSelectedProjects(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -43,7 +45,7 @@ export default function ReportsPage() {
   const exportCsv = () => {
     if (!report) return;
     const rows = [
-      ['Datum', 'Beschreibung', 'Projekt', 'Kunde', 'Start', 'Ende', 'Dauer', 'Stundensatz', 'Betrag'],
+      [t('reports.csvHeaders.date'), t('reports.csvHeaders.description'), t('reports.csvHeaders.project'), t('reports.csvHeaders.client'), t('reports.csvHeaders.start'), t('reports.csvHeaders.end'), t('reports.csvHeaders.duration'), t('reports.csvHeaders.hourlyRate'), t('reports.csvHeaders.amount')],
       ...report.entries.map((e: ReportEntry) => [
         formatDate(e.start_time),
         e.description ?? '',
@@ -55,7 +57,7 @@ export default function ReportsPage() {
         e.hourly_rate ? formatCurrency(e.hourly_rate) : '',
         formatCurrency(e.amount),
       ]),
-      ['', '', '', '', '', 'TOTAL', formatDuration(report.totalSeconds), '', formatCurrency(report.totalAmount)],
+      ['', '', '', '', '', t('reports.total'), formatDuration(report.totalSeconds), '', formatCurrency(report.totalAmount)],
     ];
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -77,7 +79,7 @@ export default function ReportsPage() {
         <td>${e.is_billable ? formatCurrency(e.amount) : '–'}</td>
       </tr>`).join('');
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-      <title>Arbeitsrapport ${from} – ${to}</title>
+      <title>${t('reports.printTitle')} ${from} – ${to}</title>
       <style>
         body { font-family: sans-serif; font-size: 11px; color: #000; margin: 20px; }
         h1 { font-size: 16px; margin-bottom: 4px; }
@@ -88,16 +90,16 @@ export default function ReportsPage() {
         .total { font-weight: bold; background: #f9fafb; }
         @media print { body { margin: 0; } }
       </style></head><body>
-      <h1>Arbeitsrapport</h1>
-      <p>Zeitraum: ${formatDate(from)} – ${formatDate(to)}</p>
+      <h1>${t('reports.printTitle')}</h1>
+      <p>${t('reports.printPeriod')} ${formatDate(from)} – ${formatDate(to)}</p>
       <table>
         <thead><tr>
-          <th>Datum</th><th>Beschreibung</th><th>Projekt</th><th>Kunde</th>
-          <th>Zeit</th><th>Dauer</th><th>Betrag</th>
+          <th>${t('reports.printColDate')}</th><th>${t('reports.printColDescription')}</th><th>${t('reports.printColProject')}</th><th>${t('reports.printColClient')}</th>
+          <th>${t('reports.printColTime')}</th><th>${t('reports.printColDuration')}</th><th>${t('reports.printColAmount')}</th>
         </tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr class="total">
-          <td colspan="5">TOTAL</td>
+          <td colspan="5">${t('reports.total')}</td>
           <td>${formatDuration(report.totalSeconds)}</td>
           <td>${formatCurrency(report.totalAmount)}</td>
         </tr></tfoot>
@@ -110,23 +112,23 @@ export default function ReportsPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-primary">Berichte</h1>
+        <h1 className="text-lg font-semibold text-primary">{t('reports.title')}</h1>
         <div className="flex gap-2">
           <button onClick={() => setShowImport(true)}
             className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-lg text-sm text-secondary hover:text-primary hover:border-accent">
-            <Upload size={15} /> Clockify importieren
+            <Upload size={15} /> {t('reports.importClockify')}
           </button>
           <button onClick={exportCsv} disabled={!report?.entries.length}
             className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-lg text-sm text-secondary hover:text-primary hover:border-accent disabled:opacity-40">
-            <Download size={15} /> CSV
+            <Download size={15} /> {t('reports.exportCsv')}
           </button>
           <button onClick={printReport} disabled={!report?.entries.length}
             className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-lg text-sm text-secondary hover:text-primary hover:border-accent disabled:opacity-40">
-            <Printer size={15} /> Drucken
+            <Printer size={15} /> {t('reports.print')}
           </button>
           <button onClick={() => setShowRapport(true)}
             className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm">
-            <FileSpreadsheet size={15} /> Arbeitsrapport (.xlsx)
+            <FileSpreadsheet size={15} /> {t('reports.createRapport')}
           </button>
         </div>
       </div>
@@ -135,37 +137,37 @@ export default function ReportsPage() {
       <div className="bg-card border border-border rounded-xl p-4 space-y-4">
         <div className="flex gap-3 flex-wrap items-end">
           <div>
-            <label className="text-xs text-secondary block mb-1.5">Zeitraum</label>
-            <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
+            <label className="text-xs text-secondary block mb-1.5">{t('reports.periodLabel')}</label>
+            <DateRangePicker from={from} to={to} onChange={(f, t2) => { setFrom(f); setTo(t2); }} />
           </div>
           <div>
-            <label className="text-xs text-secondary block mb-1">Abrechenbarkeit</label>
+            <label className="text-xs text-secondary block mb-1">{t('reports.billabilityLabel')}</label>
             <select value={billable} onChange={e => setBillable(e.target.value as typeof billable)}
               className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-primary outline-none">
-              <option value="all">Alle</option>
-              <option value="billable">Abrechenbar</option>
-              <option value="non_billable">Nicht abrechenbar</option>
+              <option value="all">{t('reports.billabilityAll')}</option>
+              <option value="billable">{t('reports.billabilityBillable')}</option>
+              <option value="non_billable">{t('reports.billabilityNonBillable')}</option>
             </select>
           </div>
           <div>
-            <label className="text-xs text-secondary block mb-1">Gruppierung</label>
+            <label className="text-xs text-secondary block mb-1">{t('reports.groupByLabel')}</label>
             <select value={groupBy} onChange={e => setGroupBy(e.target.value)}
               className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-primary outline-none">
-              <option value="project">Projekt</option>
-              <option value="client">Kunde</option>
-              <option value="day">Tag</option>
+              <option value="project">{t('reports.groupByProject')}</option>
+              <option value="client">{t('reports.groupByClient')}</option>
+              <option value="day">{t('reports.groupByDay')}</option>
             </select>
           </div>
           <button onClick={search}
             className="px-4 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm ml-auto">
-            Anzeigen
+            {t('common.show')}
           </button>
         </div>
 
         {/* Multi-select filters */}
         {(clients ?? []).length > 0 && (
           <div>
-            <label className="text-xs text-secondary block mb-1.5">Kunden filtern</label>
+            <label className="text-xs text-secondary block mb-1.5">{t('reports.filterClients')}</label>
             <div className="flex flex-wrap gap-2">
               {(clients ?? []).filter(c => c.is_active).map(c => (
                 <button key={c.id} onClick={() => toggleClient(c.id)}
@@ -178,7 +180,7 @@ export default function ReportsPage() {
         )}
         {(projects ?? []).length > 0 && (
           <div>
-            <label className="text-xs text-secondary block mb-1.5">Projekte filtern</label>
+            <label className="text-xs text-secondary block mb-1.5">{t('reports.filterProjects')}</label>
             <div className="flex flex-wrap gap-2">
               {(projects ?? []).filter(p => p.is_active).map(p => (
                 <button key={p.id} onClick={() => toggleProject(p.id)}
@@ -200,18 +202,18 @@ export default function ReportsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-secondary">
-                <th className="text-left px-4 py-3">Datum</th>
-                <th className="text-left px-4 py-3">Beschreibung</th>
-                <th className="text-left px-4 py-3">Projekt</th>
-                <th className="text-left px-4 py-3">Kunde</th>
-                <th className="text-right px-4 py-3">Start – Ende</th>
-                <th className="text-right px-4 py-3">Dauer</th>
-                <th className="text-right px-4 py-3">Betrag</th>
+                <th className="text-left px-4 py-3">{t('reports.colDate')}</th>
+                <th className="text-left px-4 py-3">{t('reports.colDescription')}</th>
+                <th className="text-left px-4 py-3">{t('reports.colProject')}</th>
+                <th className="text-left px-4 py-3">{t('reports.colClient')}</th>
+                <th className="text-right px-4 py-3">{t('reports.colStartEnd')}</th>
+                <th className="text-right px-4 py-3">{t('reports.colDuration')}</th>
+                <th className="text-right px-4 py-3">{t('reports.colAmount')}</th>
               </tr>
             </thead>
             <tbody>
               {report.entries.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-8 text-secondary">Keine Einträge im gewählten Zeitraum</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-secondary">{t('reports.noEntriesInPeriod')}</td></tr>
               )}
               {report.entries.map((e: ReportEntry) => (
                 <tr key={e.id} className="border-b border-border/50 hover:bg-white/3 transition-colors">
@@ -235,7 +237,7 @@ export default function ReportsPage() {
             {report.entries.length > 0 && (
               <tfoot>
                 <tr className="border-t-2 border-border bg-sidebar/50">
-                  <td colSpan={5} className="px-4 py-3 text-xs text-secondary font-medium uppercase">TOTAL</td>
+                  <td colSpan={5} className="px-4 py-3 text-xs text-secondary font-medium uppercase">{t('reports.total')}</td>
                   <td className="px-4 py-3 text-right font-mono font-semibold text-primary tabular-nums">{formatDuration(report.totalSeconds)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-primary">{formatCurrency(report.totalAmount)}</td>
                 </tr>
@@ -248,7 +250,7 @@ export default function ReportsPage() {
       {showImport && (
         <ImportModal
           onClose={() => setShowImport(false)}
-          onDone={() => { setTrigger(t => t + 1); }}
+          onDone={() => { setTrigger(tr => tr + 1); }}
         />
       )}
 

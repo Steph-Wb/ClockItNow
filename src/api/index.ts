@@ -108,11 +108,12 @@ export const updateSettings = (data: AppSettings) =>
 
 // Arbeitsrapport (binärer Download)
 export const downloadArbeitsrapport = async (params: {
-  from: string; to: string; clientId: number; projektText?: string; rapportNr?: string;
+  from: string; to: string; clientId: number; projektText?: string; rapportNr?: string; lang?: string;
 }): Promise<Blob> => {
   const qs = new URLSearchParams({ from: params.from, to: params.to, clientId: String(params.clientId) });
   if (params.projektText) qs.set('projektText', params.projektText);
   if (params.rapportNr) qs.set('rapportNr', params.rapportNr);
+  if (params.lang) qs.set('lang', params.lang);
   const res = await fetch(`/api/arbeitsrapport?${qs}`, { credentials: 'include' });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));

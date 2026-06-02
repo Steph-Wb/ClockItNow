@@ -57,7 +57,7 @@ router.post('/', (req: Request, res: Response) => {
 router.put('/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM time_entries WHERE id = ? AND user_id = ?').get(Number(id), uid(req)) as any;
-  if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (!existing) return res.status(404).json({ error: 'errors.notFound' });
   const { description, project_id, task_id, start_time, end_time, is_billable } = req.body;
   db.prepare(
     'UPDATE time_entries SET description=?, project_id=?, task_id=?, start_time=?, end_time=?, is_billable=? WHERE id=? AND user_id=?'
@@ -76,7 +76,7 @@ router.put('/:id', (req: Request, res: Response) => {
 
 router.delete('/:id', (req: Request, res: Response) => {
   const existing = db.prepare('SELECT id FROM time_entries WHERE id = ? AND user_id = ?').get(Number(req.params.id), uid(req));
-  if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (!existing) return res.status(404).json({ error: 'errors.notFound' });
   db.prepare('DELETE FROM time_entries WHERE id = ? AND user_id = ?').run(Number(req.params.id), uid(req));
   res.json({ success: true });
 });

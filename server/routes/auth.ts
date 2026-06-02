@@ -48,11 +48,11 @@ router.get('/status', (req: Request, res: Response) => {
 // ── POST /api/auth/register ──────────────────────────────────────────────────
 router.post('/register', async (req: Request, res: Response) => {
   const existing = db.prepare('SELECT id FROM users LIMIT 1').get();
-  if (existing) { res.status(403).json({ error: 'Registrierung nicht möglich – Benutzer existiert bereits' }); return; }
+  if (existing) { res.status(403).json({ error: 'errors.auth.userExists' }); return; }
 
   const { email, password } = req.body;
-  if (!email || !password) { res.status(400).json({ error: 'Email und Passwort erforderlich' }); return; }
-  if (password.length < 8)  { res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen haben' }); return; }
+  if (!email || !password) { res.status(400).json({ error: 'errors.auth.emailPasswordRequired' }); return; }
+  if (password.length < 8)  { res.status(400).json({ error: 'errors.auth.passwordTooShort' }); return; }
 
   const hash = await bcrypt.hash(password, 12);
   const result = db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)').run(email.trim(), hash);
@@ -71,13 +71,13 @@ router.post('/register', async (req: Request, res: Response) => {
 // ── POST /api/auth/login ─────────────────────────────────────────────────────
 router.post('/login', async (req: Request, res: Response) => {
   const { email, password } = req.body;
-  if (!email || !password) { res.status(400).json({ error: 'Email und Passwort erforderlich' }); return; }
+  if (!email || !password) { res.status(400).json({ error: 'errors.auth.emailPasswordRequired' }); return; }
 
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim()) as any;
-  if (!user || !user.password_hash) { res.status(401).json({ error: 'Ungültige Zugangsdaten' }); return; }
+  if (!user || !user.password_hash) { res.status(401).json({ error: 'errors.auth.invalidCredentials' }); return; }
 
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) { res.status(401).json({ error: 'Ungültige Zugangsdaten' }); return; }
+  if (!valid) { res.status(401).json({ error: 'errors.auth.invalidCredentials' }); return; }
 
   setSessionCookie(res, user.id, user.email);
   res.json({ ok: true, email: user.email });
@@ -92,10 +92,10 @@ router.post('/logout', (_req: Request, res: Response) => {
 // ── POST /api/auth/magic-link ────────────────────────────────────────────────
 router.post('/magic-link', async (req: Request, res: Response) => {
   const { email } = req.body;
-  if (!email) { res.status(400).json({ error: 'Email erforderlich' }); return; }
+  if (!email) { res.status(400).json({ error: 'errors.auth.emailRequired' }); return; }
 
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim()) as any;
-  if (!user) { res.status(404).json({ error: 'Kein Konto mit dieser E-Mail-Adresse gefunden' }); return; }
+  if (!user) { res.status(404).json({ error: 'errors.auth.accountNotFound' }); return; }
 
   // Token generieren (32 Byte = 64 Hex-Zeichen)
   const token = crypto.randomBytes(32).toString('hex');
@@ -127,25 +127,25 @@ router.post('/magic-link', async (req: Request, res: Response) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('SMTP-Fehler:', err);
-    res.status(500).json({ error: 'E-Mail konnte nicht gesendet werden. Prüfe die SMTP-Konfiguration in .env' });
+    res.status(500).json({ error: 'errors.auth.emailSendFailed' });
   }
 });
 
 // ── GET /api/auth/magic-link/verify ─────────────────────────────────────────
 router.get('/magic-link/verify', (req: Request, res: Response) => {
   const { token } = req.query;
-  if (!token || typeof token !== 'string') { res.status(400).json({ error: 'Token fehlt' }); return; }
+  if (!token || typeof token !== 'string') { res.status(400).json({ error: 'errors.auth.tokenMissing' }); return; }
 
   const link = db.prepare('SELECT * FROM magic_links WHERE token = ?').get(token) as any;
-  if (!link) { res.status(400).json({ error: 'Ungültiger Link' }); return; }
-  if (link.used_at) { res.status(400).json({ error: 'Dieser Link wurde bereits verwendet' }); return; }
-  if (new Date(link.expires_at) < new Date()) { res.status(400).json({ error: 'Link abgelaufen' }); return; }
+  if (!link) { res.status(400).json({ error: 'errors.auth.invalidLink' }); return; }
+  if (link.used_at) { res.status(400).json({ error: 'errors.auth.linkAlreadyUsed' }); return; }
+  if (new Date(link.expires_at) < new Date()) { res.status(400).json({ error: 'errors.auth.linkExpired' }); return; }
 
   // Als benutzt markieren
   db.prepare('UPDATE magic_links SET used_at = ? WHERE id = ?').run(new Date().toISOString(), link.id);
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(link.user_id) as any;
-  if (!user) { res.status(404).json({ error: 'Benutzer nicht gefunden' }); return; }
+  if (!user) { res.status(404).json({ error: 'errors.auth.userNotFound' }); return; }
 
   setSessionCookie(res, user.id, user.email);
   res.json({ ok: true, email: user.email });

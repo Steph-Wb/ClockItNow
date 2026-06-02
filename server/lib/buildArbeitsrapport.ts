@@ -15,7 +15,59 @@ export interface BuildArbeitsrapportOptions {
   projektText?: string | null;
   rapportNr: string;          // 'YYYY-MM'
   datum: string;              // Erstellungsdatum 'dd.mm.yyyy'
+  lang?: 'de' | 'en';        // Sprache der xlsx-Labels (Default: 'de')
 }
+
+/** Serverseitige Label-Map (gespiegelt zu arbeitsrapport.xlsx.* in den JSON-Dateien) */
+const LABELS: Record<'de' | 'en', {
+  title: string;
+  client: string;
+  reportNr: string;
+  date: string;
+  project: string;
+  workPerformed: string;
+  colDate: string;
+  colDuration: string;
+  colActivity: string;
+  colDurationSum: string;
+  subtotal: string;
+  total: string;
+  signature: string;
+  noProject: string;
+}> = {
+  de: {
+    title:        'Arbeitsrapport',
+    client:       'Kunde',
+    reportNr:     'Rapport-Nr.',
+    date:         'Datum:',
+    project:      'Projekt',
+    workPerformed:'Ausgeführte Arbeiten',
+    colDate:      'Datum',
+    colDuration:  'Dauer',
+    colActivity:  'Tätigkeit',
+    colDurationSum:'Dauer sum.',
+    subtotal:     'Zwischentotal',
+    total:        'Total Arbeiten',
+    signature:    'Datum / Unterschrift',
+    noProject:    'Ohne Projekt',
+  },
+  en: {
+    title:        'Work Report',
+    client:       'Client',
+    reportNr:     'Report No.',
+    date:         'Date:',
+    project:      'Project',
+    workPerformed:'Work performed',
+    colDate:      'Date',
+    colDuration:  'Duration',
+    colActivity:  'Activity',
+    colDurationSum:'Duration sum.',
+    subtotal:     'Subtotal',
+    total:        'Total',
+    signature:    'Date / Signature',
+    noProject:    'No project',
+  },
+};
 
 interface DayRow {
   date: string;               // 'dd.mm.yyyy'
@@ -77,7 +129,7 @@ function groupByProject(entries: RapportEntry[]): ProjectBlock[] {
   const order: string[] = [];
   const map = new Map<string, RapportEntry[]>();
   for (const e of entries) {
-    const name = (e.project_name ?? '').trim() || 'Ohne Projekt';
+    const name = (e.project_name ?? '').trim() || '__NO_PROJECT__';
     if (!map.has(name)) { map.set(name, []); order.push(name); }
     map.get(name)!.push(e);
   }
@@ -95,9 +147,18 @@ const thinBlack = { style: 'thin' as const, color: { argb: BLACK } };
 const doubleBlack = { style: 'double' as const, color: { argb: BLACK } };
 
 export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): ExcelJS.Workbook {
+  const L = LABELS[opts.lang ?? 'de'];
+
+  // Resolve no-project placeholder to localized label
+  const blocks_raw = groupByProject(opts.entries);
+  const resolvedBlocks = blocks_raw.map(b => ({
+    ...b,
+    projectName: b.projectName === '__NO_PROJECT__' ? L.noProject : b.projectName,
+  }));
+
   const wb = new ExcelJS.Workbook();
   wb.creator = 'ClockItNow';
-  const ws = wb.addWorksheet('Arbeitsrapport', {
+  const ws = wb.addWorksheet(L.title, {
     pageSetup: { paperSize: 9, orientation: 'portrait', margins: { left: 0.7, right: 0.7, top: 0.7, bottom: 0.7, header: 0.3, footer: 0.3 } },
   });
 
@@ -108,7 +169,7 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
   ws.getColumn(3).width = 53.3;
   ws.getColumn(4).width = 12;
 
-  const blocks = groupByProject(opts.entries);
+  const blocks = resolvedBlocks;
   const total = blocks.reduce((s, b) => s + b.subtotal, 0);
   const showSubtotals = blocks.length > 1;
 
@@ -117,7 +178,7 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
   // ── Titel (#1: Zeilenhöhe gross genug) ──────────────────────────────────────
   ws.mergeCells(r, 1, r, 4);
   const title = ws.getCell(r, 1);
-  title.value = 'Arbeitsrapport';
+  title.value = L.title;
   title.font = { bold: true, size: 26 };
   title.alignment = { vertical: 'middle' };
   ws.getRow(r).height = 42;
@@ -141,7 +202,7 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
 
   // ── Kunde: Label über grauem Block (#2) + Rapport-Nr./Datum rechtsbündig (#4) ─
   const kundeLabelRow = r;
-  ws.getCell(kundeLabelRow, 1).value = 'Kunde';
+  ws.getCell(kundeLabelRow, 1).value = L.client;
   ws.getCell(kundeLabelRow, 1).font = { bold: true };
   r += 1;
 
@@ -154,13 +215,13 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
   ws.getCell(r + 2, 1).font = { size: 10 };
 
   // Rapport-Nr. + Datum rechtsbündig (Label in C, Wert in D), um eine Zeile tiefer
-  ws.getCell(r, 3).value = 'Rapport-Nr.';
+  ws.getCell(r, 3).value = L.reportNr;
   ws.getCell(r, 3).font = { size: 10 };
   ws.getCell(r, 3).alignment = { horizontal: 'right' };
   ws.getCell(r, 4).value = opts.rapportNr;
   ws.getCell(r, 4).font = { bold: true };
   ws.getCell(r, 4).alignment = { horizontal: 'right' };
-  ws.getCell(r + 1, 3).value = 'Datum:';
+  ws.getCell(r + 1, 3).value = L.date;
   ws.getCell(r + 1, 3).font = { size: 10 };
   ws.getCell(r + 1, 3).alignment = { horizontal: 'right' };
   ws.getCell(r + 1, 4).value = opts.datum;            // #5: Erstellungsdatum
@@ -175,7 +236,7 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
   r = blockStart + 4;
 
   // ── Projekt ─────────────────────────────────────────────────────────────────
-  ws.getCell(r, 1).value = 'Projekt';
+  ws.getCell(r, 1).value = L.project;
   ws.getCell(r, 1).font = { bold: true };
   r += 1;
   ws.mergeCells(r, 1, r, 4);
@@ -187,13 +248,13 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
   r += 2;
 
   // ── Ausgeführte Arbeiten ────────────────────────────────────────────────────
-  ws.getCell(r, 1).value = 'Ausgeführte Arbeiten';
+  ws.getCell(r, 1).value = L.workPerformed;
   ws.getCell(r, 1).font = { bold: true };
   r += 1;
 
   // Tabellenkopf
   const headerRow = r;
-  const headers = ['Datum', 'Dauer', 'Tätigkeit', 'Dauer sum.'];
+  const headers = [L.colDate, L.colDuration, L.colActivity, L.colDurationSum];
   headers.forEach((h, i) => {
     const c = ws.getCell(headerRow, i + 1);
     c.value = h;
@@ -235,7 +296,7 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
     // Zwischentotal je Block (nur bei mehreren Projekten)
     if (showSubtotals) {
       const zt = ws.getRow(r);
-      zt.getCell(3).value = 'Zwischentotal';
+      zt.getCell(3).value = L.subtotal;
       zt.getCell(3).font = { bold: true };
       zt.getCell(3).alignment = { horizontal: 'right' };
       zt.getCell(4).value = Math.round(block.subtotal * 100) / 100;
@@ -249,7 +310,7 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
 
   // ── Total Arbeiten ──────────────────────────────────────────────────────────
   const totalRow = ws.getRow(r);
-  totalRow.getCell(3).value = 'Total Arbeiten';
+  totalRow.getCell(3).value = L.total;
   totalRow.getCell(3).font = { bold: true };
   totalRow.getCell(3).alignment = { horizontal: 'right' };
   totalRow.getCell(3).border = { bottom: doubleBlack };                 // #8
@@ -273,7 +334,7 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
   ws.getCell(lineRow, 2).font = { size: 10 };
   ws.getCell(lineRow, 2).alignment = { vertical: 'bottom' };
   ws.mergeCells(lineRow, 2, lineRow, 4);
-  ws.getCell(lineRow + 1, 2).value = 'Datum / Unterschrift';
+  ws.getCell(lineRow + 1, 2).value = L.signature;
   ws.getCell(lineRow + 1, 2).font = { size: 9, color: { argb: 'FF666666' } };
 
   // Unterschrift-Grafik sitzt im reservierten Raum direkt über der Linie

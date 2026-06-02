@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useTimer } from '../hooks/useTimer';
 import { getProjects, getTimeEntries, updateTimeEntry } from '../api';
+import { translateError } from '../i18n';
 import TimerBar from '../components/Timer/TimerBar';
 import TimeEntryList from '../components/Timer/TimeEntryList';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -8,6 +10,7 @@ import ErrorBanner from '../components/ui/ErrorBanner';
 import type { Project, TimeEntry } from '../types';
 
 export default function TrackerPage() {
+  const { t } = useTranslation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,9 +21,9 @@ export default function TrackerPage() {
       const data = await getTimeEntries();
       setEntries(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(translateError(t, e instanceof Error ? e.message : t('common.error')));
     }
-  }, []);
+  }, [t]);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -28,7 +31,7 @@ export default function TrackerPage() {
       const [proj] = await Promise.all([getProjects({ active: true }), loadEntries()]);
       setProjects(Array.isArray(proj) ? proj : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(translateError(t, e instanceof Error ? e.message : t('common.error')));
     } finally {
       setIsLoading(false);
     }

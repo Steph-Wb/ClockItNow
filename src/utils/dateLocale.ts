@@ -3,10 +3,17 @@ import {
   subMonths, startOfYear, endOfYear, format, parseISO,
 } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { enGB } from 'date-fns/locale';
+import i18n from '../i18n/config';
 
 export const WEEK_OPTIONS = { weekStartsOn: 1 as const };
 
-export const dateLocale = de;
+/** Returns the date-fns locale matching the current i18n language. */
+function getLocale() {
+  return i18n.language === 'en' ? enGB : de;
+}
+
+export const dateLocale = de; // kept for backward compat (e.g. direct imports in old code)
 
 export function getWeekRange(date = new Date()) {
   return {
@@ -32,9 +39,12 @@ export function getPeriodRange(period: string, customFrom?: Date, customTo?: Dat
   }
 }
 
-export function formatDate(date: Date | string, fmt = 'dd.MM.yyyy'): string {
+export function formatDate(date: Date | string, fmt?: string): string {
   const d = typeof date === 'string' ? parseISO(date) : date;
-  return format(d, fmt, { locale: de });
+  const locale = getLocale();
+  // EN uses MM/dd/yyyy, DE uses dd.MM.yyyy
+  const defaultFmt = i18n.language === 'en' ? 'MM/dd/yyyy' : 'dd.MM.yyyy';
+  return format(d, fmt ?? defaultFmt, { locale });
 }
 
 export function formatTime(date: Date | string): string {
@@ -44,5 +54,8 @@ export function formatTime(date: Date | string): string {
 
 export function formatDateHeader(date: Date | string): string {
   const d = typeof date === 'string' ? parseISO(date) : date;
-  return format(d, 'EEEE, d. MMMM yyyy', { locale: de });
+  const locale = getLocale();
+  // EN: "Monday, June 2, 2026" — DE: "Montag, 2. Juni 2026"
+  const fmt = i18n.language === 'en' ? 'EEEE, MMMM d, yyyy' : 'EEEE, d. MMMM yyyy';
+  return format(d, fmt, { locale });
 }

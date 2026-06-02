@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Plus, X, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getTasks, createTask } from '../../api';
 import type { Task } from '../../types';
 
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function TaskSelector({ projectId, value, onChange }: Props) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [creating, setCreating] = useState(false);
@@ -17,7 +19,7 @@ export default function TaskSelector({ projectId, value, onChange }: Props) {
   const [saving, setSaving] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedTask = tasks.find(t => t.id === value);
+  const selectedTask = tasks.find(tk => tk.id === value);
 
   useEffect(() => {
     getTasks(projectId).then(setTasks).catch(() => {});
@@ -75,7 +77,7 @@ export default function TaskSelector({ projectId, value, onChange }: Props) {
         ) : (
           <>
             <Plus size={11} />
-            <span>Aufgabe</span>
+            <span>{t('timer.task')}</span>
             <ChevronDown size={11} className="text-secondary" />
           </>
         )}
@@ -89,22 +91,22 @@ export default function TaskSelector({ projectId, value, onChange }: Props) {
                 onClick={() => { onChange(undefined); setOpen(false); }}
                 className="w-full text-left px-3 py-2 text-xs text-secondary hover:text-primary hover:bg-white/5 transition-colors"
               >
-                Keine Aufgabe
+                {t('timer.noTask')}
               </button>
             )}
             {tasks.length === 0 && !creating && (
-              <p className="px-3 py-3 text-xs text-secondary text-center">Noch keine Aufgaben</p>
+              <p className="px-3 py-3 text-xs text-secondary text-center">{t('timer.noTasksYet')}</p>
             )}
-            {tasks.map(t => (
+            {tasks.map(tk => (
               <button
-                key={t.id}
-                onClick={() => { onChange(t.id); setOpen(false); }}
+                key={tk.id}
+                onClick={() => { onChange(tk.id); setOpen(false); }}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-white/5 ${
-                  t.id === value ? 'text-accent' : 'text-primary'
+                  tk.id === value ? 'text-accent' : 'text-primary'
                 }`}
               >
-                {t.id === value && <Check size={12} className="flex-shrink-0" />}
-                <span className="truncate">{t.name}</span>
+                {tk.id === value && <Check size={12} className="flex-shrink-0" />}
+                <span className="truncate">{tk.name}</span>
               </button>
             ))}
           </div>
@@ -116,7 +118,7 @@ export default function TaskSelector({ projectId, value, onChange }: Props) {
                   autoFocus
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
-                  placeholder="Aufgabenname"
+                  placeholder={t('timer.taskNamePlaceholder')}
                   onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreating(false); }}
                   className="flex-1 bg-background border border-border rounded-lg px-2 py-1 text-xs text-primary outline-none focus:border-accent"
                 />
@@ -137,7 +139,7 @@ export default function TaskSelector({ projectId, value, onChange }: Props) {
                 className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-accent hover:bg-accent/5 rounded-lg transition-colors"
               >
                 <Plus size={12} />
-                Aufgabe erstellen
+                {t('timer.createTask')}
               </button>
             )}
           </div>

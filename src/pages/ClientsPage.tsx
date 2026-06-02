@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Plus, Pencil, Archive, ArchiveRestore, Check, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getClients, createClient, updateClient, archiveClient } from '../api';
 import { useApi } from '../hooks/useApi';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -9,6 +10,7 @@ import type { Client } from '../types';
 interface EditingClient { id: number; name: string; street: string; zip_city: string; rapport_postfix: string; rapport_description: string; currency: string; }
 
 export default function ClientsPage() {
+  const { t } = useTranslation();
   const [showActive, setShowActive] = useState<boolean>(true);
   const [newName, setNewName] = useState('');
   const [editing, setEditing] = useState<EditingClient | null>(null);
@@ -40,9 +42,9 @@ export default function ClientsPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-primary">Kunden</h1>
+        <h1 className="text-lg font-semibold text-primary">{t('clients.title')}</h1>
         <div className="flex rounded-lg overflow-hidden border border-border">
-          {[{ label: 'Aktiv', val: true }, { label: 'Archiviert', val: false }].map(({ label, val }) => (
+          {[{ label: t('common.active'), val: true }, { label: t('common.archived'), val: false }].map(({ label, val }) => (
             <button key={label} onClick={() => setShowActive(val)}
               className={`px-3 py-1.5 text-sm transition-colors ${showActive === val ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-primary'}`}>
               {label}
@@ -53,12 +55,12 @@ export default function ClientsPage() {
 
       {/* Add new client */}
       <div className="flex gap-2">
-        <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Neuen Kunden hinzufügen..."
+        <input value={newName} onChange={e => setNewName(e.target.value)} placeholder={t('clients.addPlaceholder')}
           onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
           className="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent" />
         <button onClick={handleAdd} disabled={adding || !newName.trim()}
           className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm disabled:opacity-50">
-          <Plus size={16} /> Hinzufügen
+          <Plus size={16} /> {t('common.add')}
         </button>
       </div>
 
@@ -70,18 +72,18 @@ export default function ClientsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-secondary">
-                <th className="text-left px-4 py-3">Name</th>
-                <th className="text-left px-4 py-3">Strasse / Nr.</th>
-                <th className="text-left px-4 py-3">PLZ / Ort</th>
-                <th className="text-left px-4 py-3">Postfix</th>
-                <th className="text-left px-4 py-3">Rapport-Beschreibung</th>
-                <th className="text-left px-4 py-3">Währung</th>
+                <th className="text-left px-4 py-3">{t('clients.colName')}</th>
+                <th className="text-left px-4 py-3">{t('clients.colStreet')}</th>
+                <th className="text-left px-4 py-3">{t('clients.colZipCity')}</th>
+                <th className="text-left px-4 py-3">{t('clients.colPostfix')}</th>
+                <th className="text-left px-4 py-3">{t('clients.colDescription')}</th>
+                <th className="text-left px-4 py-3">{t('clients.colCurrency')}</th>
                 <th className="px-4 py-3 w-20" />
               </tr>
             </thead>
             <tbody>
               {clients.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-8 text-secondary">Keine Kunden</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-secondary">{t('clients.noClients')}</td></tr>
               )}
               {clients.map(client => (
                 <tr key={client.id} className="border-b border-border/50 hover:bg-white/3 transition-colors">
@@ -93,23 +95,23 @@ export default function ClientsPage() {
                       </td>
                       <td className="px-4 py-2">
                         <input value={editing.street} onChange={e => setEditing({ ...editing, street: e.target.value })}
-                          placeholder="Strasse und Nr."
+                          placeholder={t('clients.streetPlaceholder')}
                           className="bg-background border border-border rounded px-2 py-1 text-sm text-primary outline-none w-full" />
                       </td>
                       <td className="px-4 py-2">
                         <input value={editing.zip_city} onChange={e => setEditing({ ...editing, zip_city: e.target.value })}
-                          placeholder="PLZ und Ort"
+                          placeholder={t('clients.zipCityPlaceholder')}
                           className="bg-background border border-border rounded px-2 py-1 text-sm text-primary outline-none w-full" />
                       </td>
                       <td className="px-4 py-2">
                         <input type="number" min={0} max={99} value={editing.rapport_postfix}
                           onChange={e => setEditing({ ...editing, rapport_postfix: e.target.value })}
-                          placeholder="z.B. 05"
+                          placeholder={t('clients.postfixPlaceholder')}
                           className="bg-background border border-border rounded px-2 py-1 text-sm text-primary outline-none w-16" />
                       </td>
                       <td className="px-4 py-2">
                         <input value={editing.rapport_description} onChange={e => setEditing({ ...editing, rapport_description: e.target.value })}
-                          placeholder='z.B. Diverse Aufträge gemäss der Liste "abas support daily"'
+                          placeholder={t('clients.descriptionPlaceholder')}
                           className="bg-background border border-border rounded px-2 py-1 text-sm text-primary outline-none w-full" />
                       </td>
                       <td className="px-4 py-2">
@@ -138,7 +140,7 @@ export default function ClientsPage() {
                           <button onClick={() => setEditing({ id: client.id, name: client.name, street: client.street ?? '', zip_city: client.zip_city ?? '', rapport_postfix: client.rapport_postfix != null ? String(client.rapport_postfix) : '', rapport_description: client.rapport_description ?? '', currency: client.currency })}
                             className="p-1 text-secondary hover:text-accent rounded"><Pencil size={14} /></button>
                           <button onClick={async () => { await (client.is_active ? archiveClient(client.id) : updateClient(client.id, { is_active: 1 })); reload(); }}
-                            className="p-1 text-secondary hover:text-amber-400 rounded" title={client.is_active ? 'Archivieren' : 'Wiederherstellen'}>
+                            className="p-1 text-secondary hover:text-amber-400 rounded" title={client.is_active ? t('common.archive') : t('common.restore')}>
                             {client.is_active ? <Archive size={14} /> : <ArchiveRestore size={14} />}
                           </button>
                         </div>
