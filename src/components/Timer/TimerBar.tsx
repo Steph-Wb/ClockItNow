@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Play, Square, DollarSign, Check } from 'lucide-react';
 import { format, parseISO, subMinutes, isFuture } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { formatDuration } from '../../utils/formatDuration';
 import ProjectDropdown from './ProjectDropdown';
 import TaskSelector from './TaskSelector';
@@ -34,12 +35,12 @@ export default function TimerBar({
   activeDescription, activeProjectId, activeTaskId, activeIsBillable, activeStartTime,
   suggestions, projects,
 }: Props) {
+  const { t } = useTranslation();
   const [description, setDescription] = useState('');
   const [projectId, setProjectId] = useState<number | undefined>(undefined);
   const [taskId, setTaskId] = useState<number | undefined>(undefined);
   const [isBillable, setIsBillable] = useState(true);
 
-  // Autocomplete state
   const [showSug, setShowSug] = useState(false);
   const [sugIndex, setSugIndex] = useState(-1);
 
@@ -48,7 +49,6 @@ export default function TimerBar({
   const [saving, setSaving] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Filtered suggestions: alle getippten Wörter müssen in der Beschreibung enthalten sein
   const filteredSuggestions = useMemo(() => {
     if (!description.trim() || !suggestions?.length) return [];
     const words = description.toLowerCase().split(/\s+/).filter(Boolean);
@@ -68,7 +68,6 @@ export default function TimerBar({
     setSugIndex(-1);
   }, [projectId]);
 
-  // Sync fields when timer starts or active entry changes from outside (e.g. page reload)
   useEffect(() => {
     if (isRunning) {
       setDescription(activeDescription ?? '');
@@ -83,7 +82,6 @@ export default function TimerBar({
     }
   }, [isRunning, activeDescription, activeProjectId, activeTaskId, activeIsBillable]);
 
-  // Save a single field to the active entry
   const saveField = useCallback(async (data: Parameters<NonNullable<typeof onUpdateActive>>[0]) => {
     if (!isRunning || !onUpdateActive) return;
     await onUpdateActive(data);
@@ -119,7 +117,6 @@ export default function TimerBar({
     if (isRunning) saveField({ description });
   };
 
-  // Close popover on outside click
   useEffect(() => {
     if (!showPopover) return;
     const handler = (e: MouseEvent) => {
@@ -179,7 +176,6 @@ export default function TimerBar({
 
   const handleToggle = async () => {
     if (isRunning) {
-      // Save description before stopping (in case it was changed without blur)
       if (onUpdateActive) await onUpdateActive({ description });
       onStop();
     } else {
@@ -189,7 +185,7 @@ export default function TimerBar({
 
   return (
     <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
-      {/* Description – with autocomplete dropdown */}
+      {/* Description with autocomplete */}
       <div className="relative flex-1 min-w-0">
         <input
           type="text"
@@ -198,7 +194,7 @@ export default function TimerBar({
           onBlur={() => { handleDescriptionBlur(); setTimeout(() => setShowSug(false), 150); }}
           onFocus={() => { if (description.trim()) setShowSug(true); }}
           onKeyDown={handleKeyDown}
-          placeholder="Woran arbeitest du gerade?"
+          placeholder={t('timer.placeholder')}
           className="w-full bg-transparent text-primary placeholder-secondary text-sm outline-none"
         />
 
@@ -226,18 +222,15 @@ export default function TimerBar({
         )}
       </div>
 
-      {/* Project dropdown – always editable */}
       <ProjectDropdown value={projectId} onChange={handleProjectChange} />
 
-      {/* Task selector – always editable when project is selected */}
       {projectId && (
         <TaskSelector projectId={projectId} value={taskId} onChange={handleTaskChange} />
       )}
 
-      {/* Billable toggle – always editable */}
       <button
         onClick={handleBillableToggle}
-        title={isBillable ? 'Abrechenbar' : 'Nicht abrechenbar'}
+        title={isBillable ? t('timer.billable') : t('timer.notBillable')}
         className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isBillable ? 'text-accent' : 'text-secondary'}`}
       >
         <DollarSign size={16} />
@@ -248,7 +241,7 @@ export default function TimerBar({
         <button
           onClick={openPopover}
           disabled={!isRunning}
-          title={isRunning ? 'Startzeit anpassen' : undefined}
+          title={isRunning ? t('timer.adjustStartTime') : undefined}
           className={`font-mono text-lg w-24 text-right tabular-nums transition-colors ${
             isRunning ? 'text-primary hover:text-accent cursor-pointer' : 'text-primary cursor-default'
           }`}
@@ -258,7 +251,7 @@ export default function TimerBar({
 
         {showPopover && activeStartTime && (
           <div className="absolute right-0 top-full mt-2 z-50 bg-sidebar border border-border rounded-xl shadow-2xl p-4 w-64">
-            <p className="text-xs font-medium text-secondary uppercase tracking-wide mb-3">Startzeit anpassen</p>
+            <p className="text-xs font-medium text-secondary uppercase tracking-wide mb-3">{t('timer.adjustStartTime')}</p>
             <div className="flex gap-1.5 mb-3">
               {QUICK_OFFSETS.map(min => (
                 <button key={min} onClick={() => applyQuickOffset(min)} disabled={saving}
@@ -270,7 +263,7 @@ export default function TimerBar({
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <label className="text-xs text-secondary block mb-1">
-                  Uhrzeit <span className="text-secondary/60 ml-1">{format(parseISO(activeStartTime), 'dd.MM.yyyy')}</span>
+                  {t('timer.time')} <span className="text-secondary/60 ml-1">{format(parseISO(activeStartTime), 'dd.MM.yyyy')}</span>
                 </label>
                 <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') applyStartTime(editTime); if (e.key === 'Escape') setShowPopover(false); }}
@@ -285,7 +278,7 @@ export default function TimerBar({
         )}
       </div>
 
-      {/* START / STOPP */}
+      {/* START / STOP */}
       <button
         onClick={handleToggle}
         className={`flex items-center flex-shrink-0 px-4 py-1.5 rounded-lg font-medium text-sm transition-colors ${
@@ -293,7 +286,7 @@ export default function TimerBar({
         }`}
       >
         {isRunning ? <Square size={14} /> : <Play size={14} />}
-        <span className="ml-1.5">{isRunning ? 'STOPP' : 'START'}</span>
+        <span className="ml-1.5">{isRunning ? t('timer.stop') : t('timer.start')}</span>
       </button>
     </div>
   );

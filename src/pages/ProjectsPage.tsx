@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Plus, Pencil, Archive, ArchiveRestore, ChevronDown, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getProjects, createProject, updateProject, archiveProject, getClients, getTimeEntries } from '../api';
 import { useApi } from '../hooks/useApi';
 import ProjectModal from '../components/Projects/ProjectModal';
@@ -11,6 +12,7 @@ import { differenceInSeconds, parseISO } from 'date-fns';
 import type { Project, Client } from '../types';
 
 export default function ProjectsPage() {
+  const { t } = useTranslation();
   const [showActive, setShowActive] = useState<boolean | undefined>(true);
   const [search, setSearch] = useState('');
   const [clientFilter, setClientFilter] = useState<number | undefined>(undefined);
@@ -49,24 +51,24 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-primary">Projekte</h1>
+        <h1 className="text-lg font-semibold text-primary">{t('projects.title')}</h1>
         <button onClick={() => setModalProject(null)}
           className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm">
-          <Plus size={16} /> Neues Projekt
+          <Plus size={16} /> {t('projects.newProject')}
         </button>
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen..."
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('common.search')}
           className="bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-primary outline-none focus:border-accent w-48" />
         <select value={clientFilter ?? ''} onChange={e => setClientFilter(e.target.value ? Number(e.target.value) : undefined)}
           className="bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-primary outline-none">
-          <option value="">Alle Kunden</option>
+          <option value="">{t('projects.allClients')}</option>
           {(clients ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <div className="flex rounded-lg overflow-hidden border border-border">
-          {[{ label: 'Aktiv', val: true }, { label: 'Archiviert', val: false }, { label: 'Alle', val: undefined }].map(({ label, val }) => (
+          {[{ label: t('common.active'), val: true }, { label: t('common.archived'), val: false }, { label: t('common.all'), val: undefined }].map(({ label, val }) => (
             <button key={label} onClick={() => setShowActive(val)}
               className={`px-3 py-1.5 text-sm transition-colors ${showActive === val ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-primary'}`}>
               {label}
@@ -84,17 +86,17 @@ export default function ProjectsPage() {
             <thead>
               <tr className="border-b border-border text-xs text-secondary">
                 <th className="text-left px-4 py-3 w-6" />
-                <th className="text-left px-4 py-3">Projekt</th>
-                <th className="text-left px-4 py-3">Kunde</th>
-                <th className="text-right px-4 py-3">Zeit</th>
-                <th className="text-right px-4 py-3">Betrag</th>
-                <th className="text-center px-4 py-3">Status</th>
+                <th className="text-left px-4 py-3">{t('projects.colProject')}</th>
+                <th className="text-left px-4 py-3">{t('projects.colClient')}</th>
+                <th className="text-right px-4 py-3">{t('projects.colTime')}</th>
+                <th className="text-right px-4 py-3">{t('projects.colAmount')}</th>
+                <th className="text-center px-4 py-3">{t('projects.colStatus')}</th>
                 <th className="px-4 py-3 w-20" />
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-8 text-secondary">Keine Projekte</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-secondary">{t('projects.noProjects')}</td></tr>
               )}
               {filtered.map(project => {
                 const { seconds, amount } = getProjectStats(project.id);
@@ -118,14 +120,14 @@ export default function ProjectsPage() {
                       <td className="px-4 py-3 text-right text-secondary">{formatCurrency(amount)}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${project.is_active ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-secondary'}`}>
-                          {project.is_active ? 'Aktiv' : 'Archiviert'}
+                          {project.is_active ? t('common.active') : t('common.archived')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => setModalProject(project)} className="p-1 text-secondary hover:text-accent rounded"><Pencil size={14} /></button>
                           <button onClick={async () => { await (project.is_active ? archiveProject(project.id) : updateProject(project.id, { is_active: 1 })); reload(); }}
-                            className="p-1 text-secondary hover:text-amber-400 rounded" title={project.is_active ? 'Archivieren' : 'Wiederherstellen'}>
+                            className="p-1 text-secondary hover:text-amber-400 rounded" title={project.is_active ? t('common.archive') : t('common.restore')}>
                             {project.is_active ? <Archive size={14} /> : <ArchiveRestore size={14} />}
                           </button>
                         </div>
@@ -135,10 +137,10 @@ export default function ProjectsPage() {
                       <tr key={`${project.id}-detail`} className="border-b border-border/50 bg-sidebar/50">
                         <td />
                         <td colSpan={6} className="px-4 py-3 text-xs text-secondary space-y-1">
-                          <div>Stundensatz: <span className="text-primary">{formatCurrency(project.hourly_rate)}/h</span></div>
-                          <div>Abrechenbar: <span className="text-primary">{project.is_billable ? 'Ja' : 'Nein'}</span></div>
-                          <div>Erfasste Zeit: <span className="text-primary font-mono">{formatDuration(seconds)}</span></div>
-                          <div>Betrag: <span className="text-primary">{formatCurrency(amount)}</span></div>
+                          <div>{t('projects.hourlyRate')} <span className="text-primary">{formatCurrency(project.hourly_rate)}/h</span></div>
+                          <div>{t('projects.billable')} <span className="text-primary">{project.is_billable ? t('common.yes') : t('common.no')}</span></div>
+                          <div>{t('projects.trackedTime')} <span className="text-primary font-mono">{formatDuration(seconds)}</span></div>
+                          <div>{t('projects.amount')} <span className="text-primary">{formatCurrency(amount)}</span></div>
                         </td>
                       </tr>
                     )}

@@ -1,18 +1,20 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Clock, LayoutGrid, Users, BarChart2, Folder, Settings, LogOut } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { logout } from '../api';
 
-const links = [
-  { to: '/', icon: Clock, label: 'Timer' },
-  { to: '/dashboard', icon: LayoutGrid, label: 'Dashboard' },
-  { to: '/clients', icon: Users, label: 'Kunden' },
-  { to: '/reports', icon: BarChart2, label: 'Berichte' },
-  { to: '/projects', icon: Folder, label: 'Projekte' },
-  { to: '/settings', icon: Settings, label: 'Einstellungen' },
-];
-
 export default function Sidebar() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
+
+  const links = [
+    { to: '/', icon: Clock, label: t('nav.timer') },
+    { to: '/dashboard', icon: LayoutGrid, label: t('nav.dashboard') },
+    { to: '/clients', icon: Users, label: t('nav.clients') },
+    { to: '/reports', icon: BarChart2, label: t('nav.reports') },
+    { to: '/projects', icon: Folder, label: t('nav.projects') },
+    { to: '/settings', icon: Settings, label: t('nav.settings') },
+  ];
 
   const handleLogout = async () => {
     await logout().catch(() => {});
@@ -54,7 +56,7 @@ export default function Sidebar() {
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-secondary hover:text-primary hover:bg-white/5 transition-colors"
         >
           <LogOut size={18} />
-          Abmelden
+          {t('nav.logout')}
         </button>
       </div>
     </nav>

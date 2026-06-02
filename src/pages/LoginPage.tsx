@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getAuthStatus, login, register, sendMagicLink } from '../api';
+import { translateError } from '../i18n';
 
 type Tab = 'password' | 'magic';
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('password');
   const [hasUser, setHasUser] = useState(false);
@@ -32,15 +34,15 @@ export default function LoginPage() {
     setBusy(true);
     try {
       if (isRegister) {
-        if (password !== password2) { setError('Passwörter stimmen nicht überein'); return; }
-        if (password.length < 8) { setError('Passwort muss mindestens 8 Zeichen haben'); return; }
+        if (password !== password2) { setError(t('errors.auth.passwordMismatch')); return; }
+        if (password.length < 8) { setError(t('errors.auth.passwordTooShort')); return; }
         await register(email.trim(), password);
       } else {
         await login(email.trim(), password);
       }
       navigate('/', { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(translateError(t, e instanceof Error ? e.message : t('common.error')));
     } finally { setBusy(false); }
   };
 
@@ -51,9 +53,9 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await sendMagicLink(email.trim());
-      setInfo('E-Mail gesendet! Prüfe dein Postfach – der Link ist 15 Minuten gültig.');
+      setInfo(t('auth.emailSent'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(translateError(t, e instanceof Error ? e.message : t('common.error')));
     } finally { setBusy(false); }
   };
 
@@ -69,40 +71,40 @@ export default function LoginPage() {
         {/* Card */}
         <div className="bg-card border border-border rounded-xl p-6">
           <h1 className="text-lg font-semibold text-primary mb-1">
-            {isRegister && !hasUser ? 'Konto einrichten' : 'Anmelden'}
+            {isRegister && !hasUser ? t('auth.setupAccount') : t('auth.login')}
           </h1>
           <p className="text-sm text-secondary mb-5">
-            {isRegister && !hasUser ? 'Erstelle dein persönliches Konto.' : 'Willkommen zurück.'}
+            {isRegister && !hasUser ? t('auth.createAccountSubtitle') : t('auth.welcomeBack')}
           </p>
 
-          {/* Tabs – nur wenn User schon existiert */}
+          {/* Tabs – only when user already exists */}
           {hasUser && (
             <div className="flex rounded-lg overflow-hidden border border-border mb-5">
-              {([['password', 'Passwort'], ['magic', 'Magic Link']] as [Tab, string][]).map(([t, l]) => (
-                <button key={t} onClick={() => { setTab(t); setError(''); setInfo(''); }}
-                  className={`flex-1 py-2 text-sm transition-colors ${tab === t ? 'bg-accent/10 text-accent font-medium' : 'text-secondary hover:text-primary'}`}>
-                  {l}
+              {([['password', t('auth.tabPassword')], ['magic', t('auth.tabMagicLink')]] as [Tab, string][]).map(([tabKey, label]) => (
+                <button key={tabKey} onClick={() => { setTab(tabKey); setError(''); setInfo(''); }}
+                  className={`flex-1 py-2 text-sm transition-colors ${tab === tabKey ? 'bg-accent/10 text-accent font-medium' : 'text-secondary hover:text-primary'}`}>
+                  {label}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Passwort-Tab / Registrierung */}
+          {/* Password tab / registration */}
           {(!hasUser || tab === 'password') && (
             <form onSubmit={handlePasswordSubmit} className="space-y-3">
               <div>
-                <label className="text-xs text-secondary block mb-1">E-Mail</label>
+                <label className="text-xs text-secondary block mb-1">{t('auth.email')}</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent" />
               </div>
               <div>
-                <label className="text-xs text-secondary block mb-1">Passwort</label>
+                <label className="text-xs text-secondary block mb-1">{t('auth.password')}</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent" />
               </div>
               {isRegister && (
                 <div>
-                  <label className="text-xs text-secondary block mb-1">Passwort wiederholen</label>
+                  <label className="text-xs text-secondary block mb-1">{t('auth.repeatPassword')}</label>
                   <input type="password" value={password2} onChange={e => setPassword2(e.target.value)} required
                     className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent" />
                 </div>
@@ -110,22 +112,22 @@ export default function LoginPage() {
               {error && <p className="text-xs text-danger">{error}</p>}
               <button type="submit" disabled={busy}
                 className="w-full py-2.5 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
-                {busy ? (isRegister ? 'Wird eingerichtet...' : 'Anmelden...') : (isRegister ? 'Konto erstellen & einloggen' : 'Anmelden')}
+                {busy ? (isRegister ? t('auth.settingUp') : t('auth.loggingIn')) : (isRegister ? t('auth.createAndLogin') : t('auth.login'))}
               </button>
               {hasUser && (
                 <button type="button" onClick={() => { setIsRegister(!isRegister); setError(''); }}
                   className="w-full text-xs text-secondary hover:text-primary text-center pt-1">
-                  {isRegister ? '← Zurück zum Login' : 'Passwort vergessen?'}
+                  {isRegister ? t('auth.backToLogin') : t('auth.forgotPassword')}
                 </button>
               )}
             </form>
           )}
 
-          {/* Magic-Link-Tab */}
+          {/* Magic link tab */}
           {hasUser && tab === 'magic' && (
             <form onSubmit={handleMagicLink} className="space-y-3">
               <div>
-                <label className="text-xs text-secondary block mb-1">E-Mail</label>
+                <label className="text-xs text-secondary block mb-1">{t('auth.email')}</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent" />
               </div>
@@ -133,7 +135,7 @@ export default function LoginPage() {
               {info && <p className="text-xs text-success">{info}</p>}
               <button type="submit" disabled={busy || !!info}
                 className="w-full py-2.5 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
-                {busy ? 'Sende E-Mail...' : 'Anmeldelink zusenden'}
+                {busy ? t('auth.sendingEmail') : t('auth.sendLoginLink')}
               </button>
             </form>
           )}

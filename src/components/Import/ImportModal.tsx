@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { X, Upload, Check, AlertCircle, ChevronRight, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   parseClockifyCSV, uniqueClients, uniqueProjects, uniqueTasks,
   type ClockifyRow,
@@ -23,6 +24,7 @@ interface ProjectKey { projektName: string; kundeName: string; hourlyRate: numbe
 interface TaskKey    { aufgabeName: string; projektName: string; kundeName: string; }
 
 export default function ImportModal({ onClose, onDone }: Props) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>(0);
   const [rows, setRows] = useState<ClockifyRow[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
@@ -34,14 +36,12 @@ export default function ImportModal({ onClose, onDone }: Props) {
   const [importedCount, setImportedCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
 
-  // State from checks
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasksByProject, setTasksByProject] = useState<Map<number, Task[]>>(new Map());
   const [existingEntries, setExistingEntries] = useState<ReturnType<typeof getTimeEntries> extends Promise<infer T> ? T : never>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // ── Step 0: File upload ─────────────────────────────────────────────────
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -57,7 +57,6 @@ export default function ImportModal({ onClose, onDone }: Props) {
     reader.readAsText(file, 'utf-8');
   };
 
-  // ── Step 0 → 1: Kunden laden, dann anzeigen ────────────────────────────
   const goToStep1 = useCallback(async () => {
     setBusy(true);
     try {
@@ -67,7 +66,6 @@ export default function ImportModal({ onClose, onDone }: Props) {
     } finally { setBusy(false); }
   }, []);
 
-  // ── Step 1 → 2: fehlende Kunden erstellen, Projekte laden ──────────────
   const handleStep1 = useCallback(async () => {
     setBusy(true);
     try {
@@ -80,15 +78,12 @@ export default function ImportModal({ onClose, onDone }: Props) {
         updated.push(created);
       }
       setClients(updated);
-
-      // Projekte vorladen für Schritt 2
       const existingProjects = await getProjects();
       setProjects(existingProjects);
       setStep(2);
     } finally { setBusy(false); }
   }, [rows, clients]);
 
-  // ── Step 2 → 3: fehlende Projekte erstellen, Aufgaben laden ────────────
   const handleStep2 = useCallback(async () => {
     setBusy(true);
     try {
@@ -116,7 +111,6 @@ export default function ImportModal({ onClose, onDone }: Props) {
       }
       setProjects(updated);
 
-      // Aufgaben vorladen für Schritt 3
       const csvTasks = uniqueTasks(rows);
       const relevantIds = new Set(csvTasks.map(ct =>
         updated.find(p =>
@@ -134,14 +128,12 @@ export default function ImportModal({ onClose, onDone }: Props) {
     } finally { setBusy(false); }
   }, [rows, clients, projects]);
 
-  // ── Step 3 → 4: fehlende Aufgaben erstellen, Einträge für Duplikatcheck laden
   const handleStep3 = useCallback(async () => {
     setBusy(true);
     try {
       const csvTasks = uniqueTasks(rows);
       const tasksMap = new Map(tasksByProject);
 
-      // Nur fehlende Tasks erstellen (tasksMap ist bereits aus handleStep2 befüllt)
       for (const ct of csvTasks) {
         const proj = projects.find(
           p => p.name.toLowerCase() === ct.projektName.toLowerCase()
@@ -158,7 +150,6 @@ export default function ImportModal({ onClose, onDone }: Props) {
       }
       setTasksByProject(tasksMap);
 
-      // Vorhandene Zeiteinträge für Duplikatcheck laden
       if (dateMin && dateMax) {
         const existing = await getTimeEntries({ start: dateMin, end: dateMax });
         setExistingEntries(existing as any);
@@ -168,7 +159,6 @@ export default function ImportModal({ onClose, onDone }: Props) {
     } finally { setBusy(false); }
   }, [rows, projects, tasksByProject, dateMin, dateMax]);
 
-  // ── Step 4: Import ─────────────────────────────────────────────────────
   const resolveProjectId = (row: ClockifyRow): number | undefined => {
     return projects.find(
       p => p.name.toLowerCase() === row.projektName.toLowerCase()
@@ -221,7 +211,6 @@ export default function ImportModal({ onClose, onDone }: Props) {
     } finally { setBusy(false); }
   }, [toImport, toSkip]); // eslint-disable-line
 
-  // ── Computed lists for display ──────────────────────────────────────────
   const csvClientNames = uniqueClients(rows);
   const csvProjects: ProjectKey[] = uniqueProjects(rows);
   const csvTasks: TaskKey[] = uniqueTasks(rows);
@@ -249,8 +238,7 @@ export default function ImportModal({ onClose, onDone }: Props) {
   const missingProjects = csvProjects.filter(p => projectStatus(p) === 'create');
   const missingTasks = csvTasks.filter(t => taskStatus(t) === 'create');
 
-  // ── Render ──────────────────────────────────────────────────────────────
-  const STEP_LABELS = ['Upload', 'Kunden', 'Projekte', 'Aufgaben', 'Import', 'Fertig'];
+  const stepLabels = t('import.stepLabels', { returnObjects: true }) as string[];
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -258,13 +246,13 @@ export default function ImportModal({ onClose, onDone }: Props) {
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
-          <h2 className="font-semibold text-primary">Clockify CSV importieren</h2>
+          <h2 className="font-semibold text-primary">{t('import.title')}</h2>
           <button onClick={onClose} className="text-secondary hover:text-primary"><X size={18} /></button>
         </div>
 
         {/* Step indicator */}
         <div className="flex items-center gap-1 px-6 py-3 border-b border-border flex-shrink-0">
-          {STEP_LABELS.map((label, i) => (
+          {stepLabels.map((label, i) => (
             <div key={i} className="flex items-center gap-1">
               <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
                 i < step ? 'bg-accent/20 text-accent' :
@@ -274,7 +262,7 @@ export default function ImportModal({ onClose, onDone }: Props) {
                 {i < step ? <Check size={12} /> : i + 1}
               </div>
               <span className={`text-xs hidden sm:inline ${i === step ? 'text-primary' : 'text-secondary'}`}>{label}</span>
-              {i < STEP_LABELS.length - 1 && <ChevronRight size={12} className="text-secondary/40 mx-1" />}
+              {i < stepLabels.length - 1 && <ChevronRight size={12} className="text-secondary/40 mx-1" />}
             </div>
           ))}
         </div>
@@ -282,23 +270,23 @@ export default function ImportModal({ onClose, onDone }: Props) {
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
 
-          {/* ── Step 0: Upload ── */}
+          {/* Step 0: Upload */}
           {step === 0 && (
             <div className="space-y-4">
-              <p className="text-sm text-secondary">Lade eine Clockify-Detailexport-CSV-Datei hoch (Trennzeichen: Semikolon).</p>
+              <p className="text-sm text-secondary">{t('import.uploadHint')}</p>
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 cursor-pointer hover:border-accent transition-colors">
                 <Upload size={28} className="text-secondary mb-2" />
-                <span className="text-sm text-secondary">CSV-Datei auswählen</span>
+                <span className="text-sm text-secondary">{t('import.selectFile')}</span>
                 <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} className="hidden" />
               </label>
 
               {rows.length > 0 && (
                 <div className="bg-background rounded-lg p-4 text-sm space-y-1">
-                  <div className="flex justify-between"><span className="text-secondary">Zeilen:</span><span className="text-primary font-medium">{rows.length}</span></div>
-                  <div className="flex justify-between"><span className="text-secondary">Zeitraum:</span><span className="text-primary font-medium">{dateMin ? formatDate(dateMin) : '–'} – {dateMax ? formatDate(dateMax) : '–'}</span></div>
-                  <div className="flex justify-between"><span className="text-secondary">Kunden:</span><span className="text-primary">{uniqueClients(rows).length}</span></div>
-                  <div className="flex justify-between"><span className="text-secondary">Projekte:</span><span className="text-primary">{uniqueProjects(rows).length}</span></div>
-                  <div className="flex justify-between"><span className="text-secondary">Aufgaben:</span><span className="text-primary">{uniqueTasks(rows).length}</span></div>
+                  <div className="flex justify-between"><span className="text-secondary">{t('import.rows')}</span><span className="text-primary font-medium">{rows.length}</span></div>
+                  <div className="flex justify-between"><span className="text-secondary">{t('import.period')}</span><span className="text-primary font-medium">{dateMin ? formatDate(dateMin) : '–'} – {dateMax ? formatDate(dateMax) : '–'}</span></div>
+                  <div className="flex justify-between"><span className="text-secondary">{t('import.clients')}</span><span className="text-primary">{uniqueClients(rows).length}</span></div>
+                  <div className="flex justify-between"><span className="text-secondary">{t('import.projects')}</span><span className="text-primary">{uniqueProjects(rows).length}</span></div>
+                  <div className="flex justify-between"><span className="text-secondary">{t('import.tasks')}</span><span className="text-primary">{uniqueTasks(rows).length}</span></div>
                 </div>
               )}
 
@@ -310,17 +298,17 @@ export default function ImportModal({ onClose, onDone }: Props) {
             </div>
           )}
 
-          {/* ── Step 1: Kunden ── */}
+          {/* Step 1: Clients */}
           {step === 1 && (
             <div className="space-y-3">
               <p className="text-sm text-secondary">
-                <span className="text-success font-medium">{csvClientNames.length - missingClients.length} existieren</span>
-                {missingClients.length > 0 && <span className="ml-2 text-amber-400 font-medium">{missingClients.length} werden erstellt</span>}
+                <span className="text-success font-medium">{t('import.existCount', { count: csvClientNames.length - missingClients.length })}</span>
+                {missingClients.length > 0 && <span className="ml-2 text-amber-400 font-medium">{t('import.createCount', { count: missingClients.length })}</span>}
               </p>
               <table className="w-full text-sm">
                 <thead><tr className="text-xs text-secondary border-b border-border">
-                  <th className="text-left py-2">Kundenname</th>
-                  <th className="text-right py-2">Status</th>
+                  <th className="text-left py-2">{t('import.colClientName')}</th>
+                  <th className="text-right py-2">{t('import.colStatus')}</th>
                 </tr></thead>
                 <tbody>
                   {csvClientNames.map(name => (
@@ -328,8 +316,8 @@ export default function ImportModal({ onClose, onDone }: Props) {
                       <td className="py-2 text-primary">{name}</td>
                       <td className="py-2 text-right">
                         {clientStatus(name) === 'exists'
-                          ? <span className="text-success text-xs flex items-center gap-1 justify-end"><Check size={12} /> Existiert</span>
-                          : <span className="text-amber-400 text-xs">+ Wird erstellt</span>}
+                          ? <span className="text-success text-xs flex items-center gap-1 justify-end"><Check size={12} /> {t('import.statusExists')}</span>
+                          : <span className="text-amber-400 text-xs">{t('import.statusCreate')}</span>}
                       </td>
                     </tr>
                   ))}
@@ -338,19 +326,19 @@ export default function ImportModal({ onClose, onDone }: Props) {
             </div>
           )}
 
-          {/* ── Step 2: Projekte ── */}
+          {/* Step 2: Projects */}
           {step === 2 && (
             <div className="space-y-3">
               <p className="text-sm text-secondary">
-                <span className="text-success font-medium">{csvProjects.length - missingProjects.length} existieren</span>
-                {missingProjects.length > 0 && <span className="ml-2 text-amber-400 font-medium">{missingProjects.length} werden erstellt</span>}
+                <span className="text-success font-medium">{t('import.existCount', { count: csvProjects.length - missingProjects.length })}</span>
+                {missingProjects.length > 0 && <span className="ml-2 text-amber-400 font-medium">{t('import.createCount', { count: missingProjects.length })}</span>}
               </p>
               <table className="w-full text-sm">
                 <thead><tr className="text-xs text-secondary border-b border-border">
-                  <th className="text-left py-2">Projekt</th>
-                  <th className="text-left py-2">Kunde</th>
-                  <th className="text-right py-2">Satz</th>
-                  <th className="text-right py-2">Status</th>
+                  <th className="text-left py-2">{t('import.colProject')}</th>
+                  <th className="text-left py-2">{t('import.colClient')}</th>
+                  <th className="text-right py-2">{t('import.colRate')}</th>
+                  <th className="text-right py-2">{t('import.colStatus')}</th>
                 </tr></thead>
                 <tbody>
                   {csvProjects.map(cp => (
@@ -360,8 +348,8 @@ export default function ImportModal({ onClose, onDone }: Props) {
                       <td className="py-2 text-right text-secondary text-xs">{cp.hourlyRate > 0 ? `CHF ${cp.hourlyRate}` : '–'}</td>
                       <td className="py-2 text-right">
                         {projectStatus(cp) === 'exists'
-                          ? <span className="text-success text-xs flex items-center gap-1 justify-end"><Check size={12} /> Existiert</span>
-                          : <span className="text-amber-400 text-xs">+ Wird erstellt</span>}
+                          ? <span className="text-success text-xs flex items-center gap-1 justify-end"><Check size={12} /> {t('import.statusExists')}</span>
+                          : <span className="text-amber-400 text-xs">{t('import.statusCreate')}</span>}
                       </td>
                     </tr>
                   ))}
@@ -370,21 +358,21 @@ export default function ImportModal({ onClose, onDone }: Props) {
             </div>
           )}
 
-          {/* ── Step 3: Aufgaben ── */}
+          {/* Step 3: Tasks */}
           {step === 3 && (
             <div className="space-y-3">
               {csvTasks.length === 0
-                ? <p className="text-sm text-secondary">Keine Aufgaben im CSV vorhanden.</p>
+                ? <p className="text-sm text-secondary">{t('import.noTasksInCsv')}</p>
                 : <>
                   <p className="text-sm text-secondary">
-                    <span className="text-success font-medium">{csvTasks.length - missingTasks.length} existieren</span>
-                    {missingTasks.length > 0 && <span className="ml-2 text-amber-400 font-medium">{missingTasks.length} werden erstellt</span>}
+                    <span className="text-success font-medium">{t('import.existCount', { count: csvTasks.length - missingTasks.length })}</span>
+                    {missingTasks.length > 0 && <span className="ml-2 text-amber-400 font-medium">{t('import.createCount', { count: missingTasks.length })}</span>}
                   </p>
                   <table className="w-full text-sm">
                     <thead><tr className="text-xs text-secondary border-b border-border">
-                      <th className="text-left py-2">Aufgabe</th>
-                      <th className="text-left py-2">Projekt</th>
-                      <th className="text-right py-2">Status</th>
+                      <th className="text-left py-2">{t('import.colTask')}</th>
+                      <th className="text-left py-2">{t('import.colProject')}</th>
+                      <th className="text-right py-2">{t('import.colStatus')}</th>
                     </tr></thead>
                     <tbody>
                       {csvTasks.map(ct => (
@@ -393,8 +381,8 @@ export default function ImportModal({ onClose, onDone }: Props) {
                           <td className="py-2 text-secondary">{ct.projektName}</td>
                           <td className="py-2 text-right">
                             {taskStatus(ct) === 'exists'
-                              ? <span className="text-success text-xs flex items-center gap-1 justify-end"><Check size={12} /> Existiert</span>
-                              : <span className="text-amber-400 text-xs">+ Wird erstellt</span>}
+                              ? <span className="text-success text-xs flex items-center gap-1 justify-end"><Check size={12} /> {t('import.statusExists')}</span>
+                              : <span className="text-amber-400 text-xs">{t('import.statusCreate')}</span>}
                           </td>
                         </tr>
                       ))}
@@ -404,19 +392,19 @@ export default function ImportModal({ onClose, onDone }: Props) {
             </div>
           )}
 
-          {/* ── Step 4: Import ── */}
+          {/* Step 4: Import */}
           {step === 4 && (
             <div className="space-y-4">
               <div className="bg-background rounded-lg p-4 text-sm space-y-2">
-                <div className="flex justify-between"><span className="text-secondary">Einträge in CSV:</span><span className="text-primary font-medium">{rows.length}</span></div>
-                <div className="flex justify-between"><span className="text-secondary">Bereits vorhanden (übersprungen):</span><span className="text-amber-400 font-medium">{toSkip}</span></div>
-                <div className="flex justify-between"><span className="text-secondary">Werden importiert:</span><span className="text-success font-medium">{toImport.length}</span></div>
+                <div className="flex justify-between"><span className="text-secondary">{t('import.entriesInCsv')}</span><span className="text-primary font-medium">{rows.length}</span></div>
+                <div className="flex justify-between"><span className="text-secondary">{t('import.alreadyExist')}</span><span className="text-amber-400 font-medium">{toSkip}</span></div>
+                <div className="flex justify-between"><span className="text-secondary">{t('import.toImport')}</span><span className="text-success font-medium">{toImport.length}</span></div>
               </div>
 
               {busy && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs text-secondary">
-                    <span>Importiere...</span>
+                    <span>{t('import.importing')}</span>
                     <span>{progress} / {progressTotal}</span>
                   </div>
                   <div className="h-2 bg-background rounded-full overflow-hidden">
@@ -428,21 +416,21 @@ export default function ImportModal({ onClose, onDone }: Props) {
               {toImport.length === 0 && !busy && (
                 <div className="flex items-center gap-2 text-success text-sm">
                   <Check size={16} />
-                  <span>Alle Einträge bereits vorhanden – nichts zu importieren.</span>
+                  <span>{t('import.allExist')}</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Step 5: Fertig ── */}
+          {/* Step 5: Done */}
           {step === 5 && (
             <div className="space-y-4 text-center py-4">
               <div className="w-14 h-14 rounded-full bg-success/20 flex items-center justify-center mx-auto">
                 <Check size={28} className="text-success" />
               </div>
               <div>
-                <p className="text-lg font-semibold text-primary">{importedCount} Einträge importiert</p>
-                {skippedCount > 0 && <p className="text-sm text-secondary mt-1">{skippedCount} bereits vorhandene Einträge übersprungen</p>}
+                <p className="text-lg font-semibold text-primary">{t('import.importedCount', { count: importedCount })}</p>
+                {skippedCount > 0 && <p className="text-sm text-secondary mt-1">{t('import.skippedCount', { count: skippedCount })}</p>}
               </div>
             </div>
           )}
@@ -451,62 +439,56 @@ export default function ImportModal({ onClose, onDone }: Props) {
         {/* Footer */}
         <div className="flex justify-between items-center px-6 py-4 border-t border-border flex-shrink-0">
           <button onClick={onClose} className="text-sm text-secondary hover:text-primary">
-            {step === 5 ? 'Schliessen' : 'Abbrechen'}
+            {step === 5 ? t('common.close') : t('common.cancel')}
           </button>
 
           <div className="flex gap-2">
             {step > 0 && step < 5 && !busy && (
               <button onClick={() => setStep(s => (s - 1) as Step)} className="px-4 py-2 text-sm border border-border rounded-lg text-secondary hover:text-primary">
-                Zurück
+                {t('common.back')}
               </button>
             )}
 
             {step === 0 && (
-              <button
-                onClick={goToStep1}
-                disabled={rows.length === 0 || busy}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg disabled:opacity-50"
-              >
+              <button onClick={goToStep1} disabled={rows.length === 0 || busy}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg disabled:opacity-50">
                 {busy && <Loader2 size={14} className="animate-spin" />}
-                Weiter
+                {t('common.continue')}
               </button>
             )}
 
             {step === 1 && (
               <button onClick={handleStep1} disabled={busy} className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg disabled:opacity-50">
                 {busy && <Loader2 size={14} className="animate-spin" />}
-                {missingClients.length > 0 ? `${missingClients.length} erstellen & weiter` : 'Weiter'}
+                {missingClients.length > 0 ? t('import.createAndContinue', { count: missingClients.length }) : t('common.continue')}
               </button>
             )}
 
             {step === 2 && (
               <button onClick={handleStep2} disabled={busy} className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg disabled:opacity-50">
                 {busy && <Loader2 size={14} className="animate-spin" />}
-                {missingProjects.length > 0 ? `${missingProjects.length} erstellen & weiter` : 'Weiter'}
+                {missingProjects.length > 0 ? t('import.createAndContinue', { count: missingProjects.length }) : t('common.continue')}
               </button>
             )}
 
             {step === 3 && (
               <button onClick={handleStep3} disabled={busy} className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg disabled:opacity-50">
                 {busy && <Loader2 size={14} className="animate-spin" />}
-                {missingTasks.length > 0 ? `${missingTasks.length} erstellen & weiter` : 'Weiter'}
+                {missingTasks.length > 0 ? t('import.createAndContinue', { count: missingTasks.length }) : t('common.continue')}
               </button>
             )}
 
             {step === 4 && (
-              <button
-                onClick={toImport.length === 0 ? () => setStep(5) : handleImport}
-                disabled={busy}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg disabled:opacity-50"
-              >
+              <button onClick={toImport.length === 0 ? () => setStep(5) : handleImport} disabled={busy}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg disabled:opacity-50">
                 {busy && <Loader2 size={14} className="animate-spin" />}
-                {toImport.length === 0 ? 'Fertig' : `${toImport.length} Einträge importieren`}
+                {toImport.length === 0 ? t('common.done') : t('import.importEntries', { count: toImport.length })}
               </button>
             )}
 
             {step === 5 && (
               <button onClick={() => { onDone(); onClose(); }} className="px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg">
-                Timer-Liste aktualisieren
+                {t('import.refreshTimer')}
               </button>
             )}
           </div>

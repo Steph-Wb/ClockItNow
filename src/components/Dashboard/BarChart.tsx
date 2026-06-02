@@ -1,18 +1,22 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import { formatDuration } from '../../utils/formatDuration';
+import i18n from '../../i18n/config';
 
 interface Props {
   data: { date: string; seconds: number }[];
 }
 
+const getLocale = () => i18n.language === 'en' ? 'en-GB' : 'de-CH';
+
 const formatLabel = (dateStr: string) => {
-  const d = new Date(dateStr + 'T12:00:00'); // Mittag → keine Timezone-Sprünge
-  return d.toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric' });
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString(getLocale(), { weekday: 'short', day: 'numeric' });
 };
 
 const formatLabelLong = (dateStr: string) => {
   const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('de-CH', { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString(getLocale(), { day: 'numeric', month: 'short' });
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -26,9 +30,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function DashboardBarChart({ data }: Props) {
+  const { t } = useTranslation();
   const days = data.length;
 
-  // X-Achse: Beschriftungsdichte je nach Zeitraum
   const tickFormatter = (dateStr: string, index: number) => {
     if (days <= 14) return formatLabel(dateStr);
     if (days <= 31) return index % 3 === 0 ? formatLabelLong(dateStr) : '';
@@ -37,9 +41,8 @@ export default function DashboardBarChart({ data }: Props) {
 
   return (
     <div className="bg-card border border-border rounded-xl p-5">
-      <h3 className="text-sm font-medium text-secondary mb-4">Stunden pro Tag</h3>
+      <h3 className="text-sm font-medium text-secondary mb-4">{t('dashboard.hoursPerDay')}</h3>
       <ResponsiveContainer width="100%" height={180}>
-        {/* barCategoryGap als % → Balken skalieren immer proportional zur Containerbreite */}
         <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barCategoryGap="20%">
           <XAxis
             dataKey="date"

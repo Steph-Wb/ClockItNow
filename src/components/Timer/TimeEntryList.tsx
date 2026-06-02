@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { parseISO, differenceInSeconds, addSeconds, format, isSameWeek, startOfWeek } from 'date-fns';
 import { Pencil, Trash2, Play, DollarSign, Check, X, CalendarDays } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import EntryDatePicker from './EntryDatePicker';
 import { formatDuration } from '../../utils/formatDuration';
 import { formatDateHeader, formatTime, WEEK_OPTIONS } from '../../utils/dateLocale';
@@ -20,7 +21,6 @@ interface EditState {
   value: string;
 }
 
-/** Parse "H:MM", "HH:MM" or "HH:MM:SS" → seconds */
 function parseDurationInput(val: string): number | null {
   const parts = val.trim().split(':').map(s => parseInt(s, 10));
   if (parts.some(isNaN)) return null;
@@ -29,7 +29,6 @@ function parseDurationInput(val: string): number | null {
   return null;
 }
 
-/** Format seconds as "H:MM" for the edit input */
 function durationToInput(secs: number): string {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
@@ -64,18 +63,17 @@ function groupByWeek(dayGroups: [string, TimeEntry[]][]) {
 }
 
 export default function TimeEntryList({ entries, projects, onReload, onRestart }: Props) {
+  const { t } = useTranslation();
   const [editState, setEditState] = useState<EditState | null>(null);
   const [datePickerId, setDatePickerId] = useState<number | null>(null);
   const dateButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   const moveToDate = async (entry: typeof entries[0], newDate: Date) => {
     const oldStart = parseISO(entry.start_time);
-    // Keep time-of-day, change only the date
     const newStart = new Date(newDate);
     newStart.setHours(oldStart.getHours(), oldStart.getMinutes(), oldStart.getSeconds(), 0);
     const update: Record<string, string> = { start_time: newStart.toISOString() };
     if (entry.end_time) {
-      // Keep the same duration
       const duration = differenceInSeconds(parseISO(entry.end_time), oldStart);
       update.end_time = addSeconds(newStart, duration).toISOString();
     }
@@ -86,11 +84,6 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
   const safeEntries = Array.isArray(entries) ? entries : [];
   const dayGroups = groupByDay(safeEntries);
   const weekGroups = groupByWeek(dayGroups);
-
-  if (process.env.NODE_ENV === 'development') {
-    if (!Array.isArray(entries)) console.error('[TimeEntryList] entries ist kein Array:', entries);
-    if (!Array.isArray(weekGroups)) console.error('[TimeEntryList] weekGroups ist kein Array:', weekGroups);
-  }
 
   const saveEdit = async (entry: TimeEntry) => {
     if (!editState) return;
@@ -111,7 +104,6 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
     if (editState.field === 'duration') {
       const secs = parseDurationInput(editState.value);
       if (secs !== null && secs > 0) {
-        // end_time = start_time + neue Dauer (unabhängig vom Tageswechsel)
         update.end_time = addSeconds(parseISO(entry.start_time), secs).toISOString();
       }
     }
@@ -124,7 +116,7 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Zeiteintrag löschen?')) return;
+    if (!confirm(t('timer.deleteConfirm'))) return;
     await deleteTimeEntry(id);
     onReload();
   };
@@ -137,7 +129,7 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
   if (safeEntries.length === 0) {
     return (
       <div className="text-center py-16 text-secondary text-sm">
-        Noch keine Zeiteinträge. Starte den Timer um zu beginnen.
+        {t('timer.noEntries')}
       </div>
     );
   }
@@ -155,7 +147,9 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
           <div key={week.key}>
             <div className="flex justify-between items-center mb-3 px-1">
               <span className="text-xs text-secondary font-medium uppercase tracking-wide">
-                {isThisWeek ? 'Diese Woche' : `KW ${format(weekDate, 'w')} · ${format(weekDate, 'dd.MM')} – ${format(startOfWeek(weekDate, WEEK_OPTIONS), 'dd.MM')}`}
+                {isThisWeek
+                  ? t('timer.thisWeek')
+                  : t('timer.weekLabel', { week: format(weekDate, 'w'), from: format(weekDate, 'dd.MM'), to: format(startOfWeek(weekDate, WEEK_OPTIONS), 'dd.MM') })}
               </span>
               <span className="text-sm text-primary font-mono">{formatDuration(weekSeconds)}</span>
             </div>
@@ -196,7 +190,7 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
                               onClick={() => setEditState({ id: entry.id, field: 'description', value: entry.description ?? '' })}
                               className="text-sm text-primary text-left truncate hover:text-accent transition-colors w-full"
                             >
-                              {entry.description || <span className="text-secondary italic">Keine Beschreibung</span>}
+                              {entry.description || <span className="text-secondary italic">{t('timer.noDescription')}</span>}
                             </button>
                           )}
                           {(entry.task_name || entry.project_name) && (
@@ -236,11 +230,11 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
                               </button>
                             )
                           ) : (
-                            <span className="text-accent">läuft</span>
+                            <span className="text-accent">{t('timer.running')}</span>
                           )}
                         </div>
 
-                        {/* Duration – klickbar zum direkten Bearbeiten */}
+                        {/* Duration */}
                         <div className="w-20 text-right flex-shrink-0">
                           {entry.end_time && editState?.id === entry.id && editState.field === 'duration' ? (
                             <div className="flex items-center gap-1 justify-end">
@@ -261,7 +255,7 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
                                 field: 'duration',
                                 value: durationToInput(entrySeconds(entry)),
                               })}
-                              title={entry.end_time ? 'Dauer bearbeiten' : undefined}
+                              title={entry.end_time ? t('timer.editDuration') : undefined}
                               className={`font-mono text-sm tabular-nums transition-colors ${
                                 entry.end_time
                                   ? 'text-primary hover:text-accent cursor-pointer'
@@ -278,7 +272,7 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
                           <button
                             ref={el => { if (el) dateButtonRefs.current.set(entry.id, el); else dateButtonRefs.current.delete(entry.id); }}
                             onClick={() => setDatePickerId(datePickerId === entry.id ? null : entry.id)}
-                            title="Datum verschieben"
+                            title={t('timer.moveDate')}
                             className={`p-1 rounded transition-colors ${datePickerId === entry.id ? 'text-accent' : 'text-secondary/40 hover:text-secondary'}`}
                           >
                             <CalendarDays size={14} />
@@ -296,33 +290,25 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
                         {/* Billable toggle */}
                         <button
                           onClick={() => toggleBillable(entry)}
-                          title={entry.is_billable ? 'Abrechenbar' : 'Nicht abrechenbar'}
+                          title={entry.is_billable ? t('timer.billable') : t('timer.notBillable')}
                           className={`p-1 rounded transition-colors ${entry.is_billable ? 'text-accent' : 'text-secondary/40'}`}
                         >
                           <DollarSign size={14} />
                         </button>
 
-                        {/* Actions – visible on hover */}
+                        {/* Actions */}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => onRestart(entry)}
-                            title="Neu starten"
-                            className="p-1 rounded text-secondary hover:text-accent transition-colors"
-                          >
+                          <button onClick={() => onRestart(entry)} title={t('timer.restart')}
+                            className="p-1 rounded text-secondary hover:text-accent transition-colors">
                             <Play size={14} />
                           </button>
-                          <button
-                            onClick={() => setEditState({ id: entry.id, field: 'description', value: entry.description ?? '' })}
-                            title="Bearbeiten"
-                            className="p-1 rounded text-secondary hover:text-accent transition-colors"
-                          >
+                          <button onClick={() => setEditState({ id: entry.id, field: 'description', value: entry.description ?? '' })}
+                            title={t('common.edit')}
+                            className="p-1 rounded text-secondary hover:text-accent transition-colors">
                             <Pencil size={14} />
                           </button>
-                          <button
-                            onClick={() => handleDelete(entry.id)}
-                            title="Löschen"
-                            className="p-1 rounded text-secondary hover:text-danger transition-colors"
-                          >
+                          <button onClick={() => handleDelete(entry.id)} title={t('common.delete')}
+                            className="p-1 rounded text-secondary hover:text-danger transition-colors">
                             <Trash2 size={14} />
                           </button>
                         </div>

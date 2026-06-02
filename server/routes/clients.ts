@@ -17,7 +17,7 @@ router.get('/', (req: Request, res: Response) => {
 
 router.post('/', (req: Request, res: Response) => {
   const { name, address, street, zip_city, rapport_postfix, rapport_description, currency } = req.body;
-  if (!name) return res.status(400).json({ error: 'Name is required' });
+  if (!name) return res.status(400).json({ error: 'errors.nameRequired' });
   const result = db.prepare(
     'INSERT INTO clients (name, address, street, zip_city, rapport_postfix, rapport_description, currency, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(name, address ?? null, street ?? null, zip_city ?? null,
@@ -30,7 +30,7 @@ router.put('/:id', (req: Request, res: Response) => {
   const { name, address, street, zip_city, rapport_postfix, rapport_description, currency, is_active } = req.body;
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM clients WHERE id = ? AND user_id = ?').get(Number(id), uid(req)) as any;
-  if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (!existing) return res.status(404).json({ error: 'errors.notFound' });
   db.prepare('UPDATE clients SET name = ?, address = ?, street = ?, zip_city = ?, rapport_postfix = ?, rapport_description = ?, currency = ?, is_active = ? WHERE id = ? AND user_id = ?').run(
     name ?? existing.name,
     address !== undefined ? address : existing.address,
