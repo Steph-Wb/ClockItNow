@@ -1,5 +1,5 @@
 import { Clock, DollarSign, TrendingUp, Pencil } from 'lucide-react';
-import { differenceInDays, parseISO } from 'date-fns';
+import { differenceInDays, parseISO, addDays, getDaysInMonth } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { formatDuration } from '../../utils/formatDuration';
 import { formatCurrency } from '../../utils/formatCurrency';
@@ -18,13 +18,22 @@ interface Props {
   onEditGoal?: () => void;
 }
 
-const PERIOD_DAYS: Record<GoalPeriod, number> = {
-  day: 1, week: 7, month: 30.44,
-};
-
 function getScaledTarget(goal: Goal, from: string, to: string): number {
-  const days = differenceInDays(parseISO(to), parseISO(from)) + 1;
-  return goal.amount * (days / PERIOD_DAYS[goal.period]);
+  const start = parseISO(from);
+  const end = parseISO(to);
+  const days = differenceInDays(end, start) + 1;
+  if (days <= 0) return 0;
+
+  if (goal.period === 'day') return goal.amount * days;
+  if (goal.period === 'week') return goal.amount * (days / 7);
+
+  // Month: each day contributes 1/(days in its own calendar month), so a full
+  // calendar month always sums to exactly goal.amount, regardless of its length.
+  let total = 0;
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    total += goal.amount / getDaysInMonth(d);
+  }
+  return total;
 }
 
 function fmtNum(n: number): string {
