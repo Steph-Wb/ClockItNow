@@ -91,12 +91,14 @@ export const getReports = (params: {
   from: string; to: string;
   clientIds?: number[]; projectIds?: number[];
   billable?: 'all' | 'billable' | 'non_billable';
+  billed?: 'all' | 'billed' | 'unbilled';
   groupBy?: string;
 }) => {
   const qs = new URLSearchParams({ from: params.from, to: params.to });
   if (params.clientIds?.length) qs.set('clientIds', params.clientIds.join(','));
   if (params.projectIds?.length) qs.set('projectIds', params.projectIds.join(','));
   if (params.billable && params.billable !== 'all') qs.set('billable', params.billable);
+  if (params.billed && params.billed !== 'all') qs.set('billed', params.billed);
   if (params.groupBy) qs.set('groupBy', params.groupBy);
   return req<ReportData>(`/api/reports?${qs}`);
 };
@@ -108,12 +110,13 @@ export const updateSettings = (data: AppSettings) =>
 
 // Arbeitsrapport (binärer Download)
 export const downloadArbeitsrapport = async (params: {
-  from: string; to: string; clientId: number; projektText?: string; rapportNr?: string; lang?: string;
+  from: string; to: string; clientId: number; projektText?: string; rapportNr?: string; lang?: string; includeBilled?: boolean;
 }): Promise<Blob> => {
   const qs = new URLSearchParams({ from: params.from, to: params.to, clientId: String(params.clientId) });
   if (params.projektText) qs.set('projektText', params.projektText);
   if (params.rapportNr) qs.set('rapportNr', params.rapportNr);
   if (params.lang) qs.set('lang', params.lang);
+  if (params.includeBilled) qs.set('includeBilled', 'true');
   const res = await fetch(`/api/arbeitsrapport?${qs}`, { credentials: 'include' });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));

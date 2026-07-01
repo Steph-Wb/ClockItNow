@@ -4,7 +4,7 @@ Dim oShell, scriptDir
 Set oShell = CreateObject("WScript.Shell")
 
 ' Beim Autostart: kurz warten bis Windows vollständig geladen ist
-WScript.Sleep 8000
+WScript.Sleep 4000
 
 ' Verzeichnis dieses Scripts
 scriptDir = Left(WScript.ScriptFullName, InStrRev(WScript.ScriptFullName, "\"))

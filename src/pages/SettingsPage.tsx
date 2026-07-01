@@ -8,6 +8,13 @@ import ErrorBanner from '../components/ui/ErrorBanner';
 import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import type { AppSettings } from '../types';
 
+// Vollständige IANA-Liste der Laufzeit; Fallback auf Browser-Zone, falls nicht verfügbar.
+const TIMEZONES: string[] =
+  typeof (Intl as any).supportedValuesOf === 'function'
+    ? (Intl as any).supportedValuesOf('timeZone')
+    : [Intl.DateTimeFormat().resolvedOptions().timeZone];
+const BROWSER_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 export default function SettingsPage() {
   const { t } = useTranslation();
   const { data, isLoading, error, reload } = useApi<AppSettings>(() => getSettings(), []);
@@ -15,6 +22,7 @@ export default function SettingsPage() {
   const [senderName, setSenderName] = useState('');
   const [senderAddress, setSenderAddress] = useState('');
   const [signature, setSignature] = useState<string | null>(null);
+  const [timezone, setTimezone] = useState(BROWSER_TZ);
   const [hydrated, setHydrated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -23,6 +31,7 @@ export default function SettingsPage() {
     setSenderName(data.sender_name ?? '');
     setSenderAddress(data.sender_address ?? '');
     setSignature(data.signature_png ?? null);
+    setTimezone(data.timezone || BROWSER_TZ);
     setHydrated(true);
   }
 
@@ -40,6 +49,7 @@ export default function SettingsPage() {
         sender_name: senderName.trim() || null,
         sender_address: senderAddress.trim() || null,
         signature_png: signature,
+        timezone,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -68,6 +78,18 @@ export default function SettingsPage() {
           <textarea value={senderAddress} onChange={e => setSenderAddress(e.target.value)} rows={2}
             placeholder={t('settings.senderAddressPlaceholder')}
             className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent resize-none" />
+        </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <h2 className="text-sm font-medium text-primary">{t('settings.timezoneTitle')}</h2>
+        <p className="text-xs text-secondary">{t('settings.timezoneHelp')}</p>
+        <div>
+          <label className="text-xs text-secondary mb-1.5 block">{t('settings.timezone')}</label>
+          <select value={timezone} onChange={e => setTimezone(e.target.value)}
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent">
+            {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+          </select>
         </div>
       </div>
 

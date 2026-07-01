@@ -1,4 +1,4 @@
-import { Clock, DollarSign, TrendingUp, Pencil } from 'lucide-react';
+import { Clock, DollarSign, TrendingUp, Pencil, Receipt } from 'lucide-react';
 import { differenceInDays, parseISO, addDays, getDaysInMonth } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { formatDuration } from '../../utils/formatDuration';
@@ -10,6 +10,7 @@ interface Goal { amount: number; period: GoalPeriod; }
 interface Props {
   totalSeconds: number;
   billableAmount: number;
+  billedAmount: number;
   billableSeconds: number;
   billablePercent: number;
   goal?: Goal | null;
@@ -41,7 +42,7 @@ function fmtNum(n: number): string {
 }
 
 export default function KpiCards({
-  totalSeconds, billableAmount, billableSeconds, billablePercent,
+  totalSeconds, billableAmount, billedAmount, billableSeconds, billablePercent,
   goal, periodFrom, periodTo, onEditGoal,
 }: Props) {
   const { t } = useTranslation();
@@ -61,7 +62,7 @@ export default function KpiCards({
     achievement >= 0.7 ? 'bg-amber-400' : 'bg-danger';
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-4 gap-4">
 
       {/* Total time */}
       <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-4">
@@ -132,6 +133,19 @@ export default function KpiCards({
               />
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Already billed amount */}
+      <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-4">
+        <div className="text-accent bg-white/5 rounded-lg p-2.5">
+          <Receipt size={22} />
+        </div>
+        <div>
+          <p className="text-xs text-secondary mb-0.5">{t('dashboard.billedAmount')}</p>
+          <p className="text-xl font-semibold text-accent font-mono tabular-nums">
+            {formatCurrency(billedAmount)}
+          </p>
         </div>
       </div>
 
