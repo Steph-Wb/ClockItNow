@@ -131,4 +131,11 @@ export function initDatabase(): void {
 
   if (!hasColumn('time_entries', 'user_id'))
     db.exec(`ALTER TABLE time_entries ADD COLUMN user_id INTEGER REFERENCES users(id)`);
+
+  if (!hasColumn('app_settings', 'timezone'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN timezone TEXT DEFAULT 'Europe/Zurich'`);
+
+  // Zeitstempel, wann ein Eintrag in einem Arbeitsrapport abgerechnet/rapportiert wurde (NULL = noch offen)
+  if (!hasColumn('time_entries', 'billed_at'))
+    db.exec(`ALTER TABLE time_entries ADD COLUMN billed_at TEXT`);
 }

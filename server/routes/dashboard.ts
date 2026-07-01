@@ -1,66 +1,59 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../database.js';
+import { getUserTimezone, localDateKey, addDaysKey, utcWindowForLocalRange } from '../lib/timezone.js';
 
 const router = Router();
 
-function getPeriodDates(period: string, from?: string, to?: string): { start: string; end: string } {
-  const now = new Date();
-  const toISO = (d: Date) => d.toISOString();
+/**
+ * Liefert den lokalen Datumsbereich [fromKey, toKey] (je 'YYYY-MM-DD') für einen Zeitraum.
+ * Alle Grenzen werden in der gewählten Zeitzone des Users berechnet.
+ */
+function getPeriodRange(period: string, tz: string, from?: string, to?: string): { fromKey: string; toKey: string } {
+  const todayKey = localDateKey(new Date().toISOString(), tz);
 
-  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-  const endOfDay = (d: Date) => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; };
-
-  const getMonday = (d: Date) => {
-    const x = new Date(d);
-    const day = x.getDay();
-    const diff = (day === 0 ? -6 : 1 - day);
-    x.setDate(x.getDate() + diff);
-    return startOfDay(x);
+  const mondayOf = (key: string) => {
+    const day = new Date(key + 'T00:00:00Z').getUTCDay(); // 0 = Sonntag
+    return addDaysKey(key, day === 0 ? -6 : 1 - day);
   };
+  const [y, m] = todayKey.split('-').map(Number);
+  const monthRange = (year: number, month1: number) => ({
+    fromKey: `${year}-${String(month1).padStart(2, '0')}-01`,
+    toKey: new Date(Date.UTC(year, month1, 0)).toISOString().slice(0, 10), // letzter Tag von month1
+  });
 
   switch (period) {
     case 'this_week': {
-      const start = getMonday(now);
-      const end = new Date(start); end.setDate(start.getDate() + 6); endOfDay(end);
-      return { start: toISO(start), end: toISO(endOfDay(new Date(start.getTime() + 6 * 86400000))) };
+      const mon = mondayOf(todayKey);
+      return { fromKey: mon, toKey: addDaysKey(mon, 6) };
     }
     case 'last_week': {
-      const thisMonday = getMonday(now);
-      const lastMonday = new Date(thisMonday); lastMonday.setDate(lastMonday.getDate() - 7);
-      const lastSunday = new Date(lastMonday); lastSunday.setDate(lastSunday.getDate() + 6);
-      return { start: toISO(lastMonday), end: toISO(endOfDay(lastSunday)) };
+      const lastMon = addDaysKey(mondayOf(todayKey), -7);
+      return { fromKey: lastMon, toKey: addDaysKey(lastMon, 6) };
     }
-    case 'this_month': {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      return { start: toISO(startOfDay(start)), end: toISO(endOfDay(end)) };
-    }
-    case 'last_month': {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const end = new Date(now.getFullYear(), now.getMonth(), 0);
-      return { start: toISO(startOfDay(start)), end: toISO(endOfDay(end)) };
-    }
-    case 'this_year': {
-      const start = new Date(now.getFullYear(), 0, 1);
-      const end = new Date(now.getFullYear(), 11, 31);
-      return { start: toISO(startOfDay(start)), end: toISO(endOfDay(end)) };
-    }
+    case 'this_month':
+      return monthRange(y, m);
+    case 'last_month':
+      return m === 1 ? monthRange(y - 1, 12) : monthRange(y, m - 1);
+    case 'this_year':
+      return { fromKey: `${y}-01-01`, toKey: `${y}-12-31` };
     case 'custom':
-      return {
-        start: from ? new Date(from).toISOString() : toISO(startOfDay(now)),
-        end: to ? new Date(to).toISOString() : toISO(endOfDay(now)),
-      };
-    default:
-      return { start: toISO(getMonday(now)), end: toISO(endOfDay(now)) };
+      return { fromKey: from || todayKey, toKey: to || todayKey };
+    default: {
+      const mon = mondayOf(todayKey);
+      return { fromKey: mon, toKey: todayKey };
+    }
   }
 }
 
 router.get('/', (req: Request, res: Response) => {
   const { period = 'this_week', from, to } = req.query;
-  const { start, end } = getPeriodDates(period as string, from as string, to as string);
   const userId = (req as any).user.id as number;
+  const tz = getUserTimezone(userId);
+  const { fromKey, toKey } = getPeriodRange(period as string, tz, from as string, to as string);
+  // SQL großzügig in UTC filtern; die exakte lokale Tagesgrenze ziehen wir unten in JS.
+  const { start, end } = utcWindowForLocalRange(fromKey, toKey);
 
-  const entries = db.prepare(`
+  const rows = db.prepare(`
     SELECT te.*, p.hourly_rate, p.color as project_color, p.name as project_name,
            c.id as client_id, c.name as client_name
     FROM time_entries te
@@ -69,9 +62,16 @@ router.get('/', (req: Request, res: Response) => {
     WHERE te.user_id = ? AND te.end_time IS NOT NULL AND te.start_time >= ? AND te.start_time <= ?
   `).all(userId, start, end) as any[];
 
+  // Nur Einträge behalten, deren lokales Datum tatsächlich im gewählten Bereich liegt.
+  const entries = rows.filter(e => {
+    const k = localDateKey(e.start_time, tz);
+    return k >= fromKey && k <= toKey;
+  });
+
   let totalSeconds = 0;
   let billableAmount = 0;
   let billableSeconds = 0;
+  let billedAmount = 0;
 
   // Farbpalette für Kunden (keine Farbe in der DB)
   const CLIENT_COLORS = ['#3B82F6','#F59E0B','#10B981','#EF4444','#8B5CF6','#06B6D4','#F97316','#84CC16','#EC4899','#14B8A6'];
@@ -85,12 +85,13 @@ router.get('/', (req: Request, res: Response) => {
     const secs = (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 1000;
     totalSeconds += secs;
 
-    const dayKey = e.start_time.slice(0, 10);
+    const dayKey = localDateKey(e.start_time, tz);
     byDay[dayKey] = (byDay[dayKey] ?? 0) + secs;
 
     if (e.is_billable && e.hourly_rate) {
       billableSeconds += secs;
       billableAmount += (secs / 3600) * e.hourly_rate;
+      if (e.billed_at) billedAmount += (secs / 3600) * e.hourly_rate;
     }
 
     if (e.project_id) {
@@ -127,16 +128,13 @@ router.get('/', (req: Request, res: Response) => {
   res.json({
     totalSeconds,
     billableAmount,
+    billedAmount,
     billablePercent: totalSeconds > 0 ? Math.round((billableSeconds / totalSeconds) * 100) : 0,
     byDay: (() => {
       // Alle Tage des Zeitraums auffüllen – auch Tage ohne Einträge erhalten seconds: 0
       const result: { date: string; seconds: number }[] = [];
-      const cursor = new Date(start);
-      const endDay = new Date(end);
-      while (cursor <= endDay) {
-        const key = cursor.toISOString().slice(0, 10);
+      for (let key = fromKey; key <= toKey; key = addDaysKey(key, 1)) {
         result.push({ date: key, seconds: byDay[key] ?? 0 });
-        cursor.setUTCDate(cursor.getUTCDate() + 1);
       }
       return result;
     })(),
@@ -144,7 +142,7 @@ router.get('/', (req: Request, res: Response) => {
     byProject: Object.values(byProject).sort((a, b) => b.seconds - a.seconds),
     byClient: Object.values(byClient).sort((a, b) => b.seconds - a.seconds).map(({ idx: _idx, ...rest }) => rest),
     topActivities: topActivities.slice(0, 10),
-    period: { start, end },
+    period: { start: fromKey, end: toKey },
   });
 });
 

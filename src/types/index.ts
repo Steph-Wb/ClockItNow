@@ -44,12 +44,14 @@ export interface TimeEntry {
   start_time: string;
   end_time?: string;
   is_billable: number;
+  billed_at?: string | null;
   created_at: string;
 }
 
 export interface DashboardData {
   totalSeconds: number;
   billableAmount: number;
+  billedAmount: number;
   billableSeconds: number;
   billablePercent: number;
   byDay: { date: string; seconds: number }[];
@@ -76,4 +78,5 @@ export interface AppSettings {
   sender_name: string | null;
   sender_address: string | null;
   signature_png: string | null;
+  timezone?: string | null;
 }

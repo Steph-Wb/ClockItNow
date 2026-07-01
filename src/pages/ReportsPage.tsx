@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Download, Printer, Upload, FileSpreadsheet } from 'lucide-react';
+import { Download, Printer, Upload, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ImportModal from '../components/Import/ImportModal';
 import ArbeitsrapportModal from '../components/Reports/ArbeitsrapportModal';
@@ -22,6 +22,7 @@ export default function ReportsPage() {
   const [from, setFrom] = useState(firstOfMonth);
   const [to, setTo] = useState(today);
   const [billable, setBillable] = useState<'all' | 'billable' | 'non_billable'>('all');
+  const [billed, setBilled] = useState<'all' | 'billed' | 'unbilled'>('all');
   const [showImport, setShowImport] = useState(false);
   const [showRapport, setShowRapport] = useState(false);
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
@@ -30,7 +31,7 @@ export default function ReportsPage() {
   const [trigger, setTrigger] = useState(0);
 
   const fetchReport = useCallback(() => getReports({
-    from, to, clientIds: selectedClients, projectIds: selectedProjects, billable, groupBy,
+    from, to, clientIds: selectedClients, projectIds: selectedProjects, billable, billed, groupBy,
   }), [trigger]); // eslint-disable-line
 
   const { data: report, isLoading, error, reload } = useApi(fetchReport, [trigger]);
@@ -150,6 +151,15 @@ export default function ReportsPage() {
             </select>
           </div>
           <div>
+            <label className="text-xs text-secondary block mb-1">{t('reports.billedLabel')}</label>
+            <select value={billed} onChange={e => setBilled(e.target.value as typeof billed)}
+              className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-primary outline-none">
+              <option value="all">{t('reports.billedAll')}</option>
+              <option value="billed">{t('reports.billedYes')}</option>
+              <option value="unbilled">{t('reports.billedNo')}</option>
+            </select>
+          </div>
+          <div>
             <label className="text-xs text-secondary block mb-1">{t('reports.groupByLabel')}</label>
             <select value={groupBy} onChange={e => setGroupBy(e.target.value)}
               className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-primary outline-none">
@@ -209,11 +219,12 @@ export default function ReportsPage() {
                 <th className="text-right px-4 py-3">{t('reports.colStartEnd')}</th>
                 <th className="text-right px-4 py-3">{t('reports.colDuration')}</th>
                 <th className="text-right px-4 py-3">{t('reports.colAmount')}</th>
+                <th className="text-center px-4 py-3">{t('reports.colBilled')}</th>
               </tr>
             </thead>
             <tbody>
               {report.entries.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-8 text-secondary">{t('reports.noEntriesInPeriod')}</td></tr>
+                <tr><td colSpan={8} className="text-center py-8 text-secondary">{t('reports.noEntriesInPeriod')}</td></tr>
               )}
               {report.entries.map((e: ReportEntry) => (
                 <tr key={e.id} className="border-b border-border/50 hover:bg-white/3 transition-colors">
@@ -231,6 +242,11 @@ export default function ReportsPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums text-primary">{formatDuration(e.duration_seconds)}</td>
                   <td className="px-4 py-3 text-right text-secondary">{e.is_billable ? formatCurrency(e.amount) : '–'}</td>
+                  <td className="px-4 py-3 text-center">
+                    {e.billed_at
+                      ? <CheckCircle2 size={15} className="inline text-success" aria-label={t('reports.billedYes')} />
+                      : <span className="text-secondary/40">–</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -240,6 +256,7 @@ export default function ReportsPage() {
                   <td colSpan={5} className="px-4 py-3 text-xs text-secondary font-medium uppercase">{t('reports.total')}</td>
                   <td className="px-4 py-3 text-right font-mono font-semibold text-primary tabular-nums">{formatDuration(report.totalSeconds)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-primary">{formatCurrency(report.totalAmount)}</td>
+                  <td />
                 </tr>
               </tfoot>
             )}
@@ -261,6 +278,7 @@ export default function ReportsPage() {
           to={to}
           defaultClientId={selectedClients.length === 1 ? selectedClients[0] : undefined}
           onClose={() => setShowRapport(false)}
+          onCreated={() => setTrigger(tr => tr + 1)}
         />
       )}
     </div>

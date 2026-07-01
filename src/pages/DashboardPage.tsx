@@ -98,6 +98,7 @@ export default function DashboardPage() {
           <KpiCards
             totalSeconds={data.totalSeconds}
             billableAmount={data.billableAmount}
+            billedAmount={data.billedAmount}
             billableSeconds={data.billableSeconds}
             billablePercent={data.billablePercent}
             goal={goal}

@@ -13,14 +13,16 @@ interface Props {
   defaultClientId?: number;
   defaultProjekt?: string;
   onClose: () => void;
+  onCreated?: () => void;
 }
 
-export default function ArbeitsrapportModal({ clients, from, to, defaultClientId, defaultProjekt, onClose }: Props) {
+export default function ArbeitsrapportModal({ clients, from, to, defaultClientId, defaultProjekt, onClose, onCreated }: Props) {
   const { t } = useTranslation();
   const initialClientId = defaultClientId ?? clients[0]?.id;
   const initialClient = clients.find(c => c.id === initialClientId);
   const [clientId, setClientId] = useState<number | undefined>(initialClientId);
   const [projekt, setProjekt] = useState(defaultProjekt ?? initialClient?.rapport_description ?? '');
+  const [includeBilled, setIncludeBilled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +43,7 @@ export default function ArbeitsrapportModal({ clients, from, to, defaultClientId
     setBusy(true);
     setError(null);
     try {
-      const blob = await downloadArbeitsrapport({ from, to, clientId, projektText: projekt, rapportNr, lang: i18n.language });
+      const blob = await downloadArbeitsrapport({ from, to, clientId, projektText: projekt, rapportNr, lang: i18n.language, includeBilled });
       const clientName = clients.find(c => c.id === clientId)?.name ?? '';
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -49,6 +51,7 @@ export default function ArbeitsrapportModal({ clients, from, to, defaultClientId
       a.download = `Arbeitsrapport-${rapportNr} ${clientName}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
+      onCreated?.();
       onClose();
     } catch (e) {
       setError(translateError(t, e instanceof Error ? e.message : t('arbeitsrapport.createError')));
@@ -79,6 +82,14 @@ export default function ArbeitsrapportModal({ clients, from, to, defaultClientId
               placeholder={t('arbeitsrapport.projektPlaceholder')}
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent resize-none" />
           </div>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input type="checkbox" checked={includeBilled} onChange={e => setIncludeBilled(e.target.checked)}
+              className="mt-0.5 accent-accent" />
+            <span className="text-xs text-secondary">
+              <span className="text-primary">{t('arbeitsrapport.includeBilledLabel')}</span><br />
+              {t('arbeitsrapport.includeBilledHint')}
+            </span>
+          </label>
           <div className="text-xs text-secondary">
             {t('arbeitsrapport.rapportNrLabel')} <span className="text-primary font-medium">{rapportNr}</span> · {t('arbeitsrapport.periodLabel')} {from} – {to}
           </div>
