@@ -40,8 +40,19 @@ export default function ReportsPage() {
 
   const search = () => setTrigger(tr => tr + 1);
 
-  const toggleClient = (id: number) => setSelectedClients(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleClient = (id: number) => setSelectedClients(prev => {
+    const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+    if (next.length > 0) {
+      setSelectedProjects(sp => sp.filter(pid => {
+        const project = (projects ?? []).find(p => p.id === pid);
+        return project?.client_id != null && next.includes(project.client_id);
+      }));
+    }
+    return next;
+  });
   const toggleProject = (id: number) => setSelectedProjects(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const visibleProjects = (projects ?? []).filter(p => p.is_active && (selectedClients.length === 0 || (p.client_id != null && selectedClients.includes(p.client_id))));
 
   const exportCsv = () => {
     if (!report) return;
@@ -188,11 +199,11 @@ export default function ReportsPage() {
             </div>
           </div>
         )}
-        {(projects ?? []).length > 0 && (
+        {visibleProjects.length > 0 && (
           <div>
             <label className="text-xs text-secondary block mb-1.5">{t('reports.filterProjects')}</label>
             <div className="flex flex-wrap gap-2">
-              {(projects ?? []).filter(p => p.is_active).map(p => (
+              {visibleProjects.map(p => (
                 <button key={p.id} onClick={() => toggleProject(p.id)}
                   className={`px-2.5 py-1 rounded-full text-xs transition-colors flex items-center gap-1.5 ${selectedProjects.includes(p.id) ? 'bg-accent text-white' : 'bg-background border border-border text-secondary hover:text-primary'}`}>
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
@@ -273,10 +284,12 @@ export default function ReportsPage() {
 
       {showRapport && (
         <ArbeitsrapportModal
-          clients={(clients ?? []).filter(c => c.is_active)}
+          clients={(clients ?? []).filter(c => selectedClients.includes(c.id))}
           from={from}
           to={to}
-          defaultClientId={selectedClients.length === 1 ? selectedClients[0] : undefined}
+          billable={billable}
+          billed={billed}
+          projectIds={selectedProjects}
           onClose={() => setShowRapport(false)}
           onCreated={() => setTrigger(tr => tr + 1)}
         />
