@@ -102,18 +102,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     lang: (lang === 'en' ? 'en' : 'de'),
   });
 
-  // Erst den Rapport fertig erzeugen – schlägt das fehl, bleibt billed_at unberührt.
   const buffer = await wb.xlsx.writeBuffer();
-
-  // Die eingeflossenen, noch offenen Einträge als rapportiert markieren –
-  // atomar in einem einzigen UPDATE (alles oder nichts).
-  const toMark = entries.filter(e => !e.billed_at).map(e => e.id as number);
-  if (toMark.length) {
-    db.prepare(
-      `UPDATE time_entries SET billed_at = datetime('now')
-       WHERE user_id = ? AND billed_at IS NULL AND id IN (${toMark.map(() => '?').join(',')})`
-    ).run(userId, ...toMark);
-  }
 
   const senderPart = settings.sender_name ? ` ${settings.sender_name}` : '';
   // Steuer- und Anführungszeichen entfernen, sonst wirft res.setHeader
@@ -123,5 +112,39 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.send(Buffer.from(buffer));
 }));
+
+/**
+ * Bestätigungs-Endpoint: markiert die Einträge eines Rapports als rapportiert.
+ * Wird vom Frontend erst NACH erfolgreichem Empfang der Datei aufgerufen –
+ * der GET-Download selbst verändert keinen Zustand mehr (Prefetch/Retry-sicher).
+ * Gleiche Filter wie der Download, damit exakt dieselben Einträge markiert werden.
+ */
+router.post('/mark-billed', (req: Request, res: Response) => {
+  const { from, to, clientId, projectIds, billable, billed } = req.body;
+  if (!from || !to || !clientId) {
+    return res.status(400).json({ error: 'errors.arbeitsrapport.paramsRequired' });
+  }
+  if (!parseDateKey(from) || !parseDateKey(to)) {
+    return res.status(400).json({ error: 'errors.arbeitsrapport.invalidDateRange' });
+  }
+  const userId = uid(req);
+  const tz = getUserTimezone(userId);
+
+  const client = db.prepare('SELECT id FROM clients WHERE id = ? AND user_id = ?').get(Number(clientId), userId);
+  if (!client) return res.status(404).json({ error: 'errors.arbeitsrapport.clientNotFound' });
+
+  const projectIdList = Array.isArray(projectIds) ? projectIds.map(Number).filter(Boolean) : [];
+  const entries = loadEntries(userId, from, to, Number(clientId), projectIdList, billable || 'all', billed || 'all', tz);
+
+  const toMark = entries.filter(e => !e.billed_at).map(e => e.id as number);
+  let marked = 0;
+  if (toMark.length) {
+    marked = db.prepare(
+      `UPDATE time_entries SET billed_at = datetime('now')
+       WHERE user_id = ? AND billed_at IS NULL AND id IN (${toMark.map(() => '?').join(',')})`
+    ).run(userId, ...toMark).changes as number;
+  }
+  res.json({ marked });
+});
 
 export default router;

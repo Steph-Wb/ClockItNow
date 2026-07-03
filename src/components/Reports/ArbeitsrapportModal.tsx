@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, FileSpreadsheet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n/config';
-import { downloadArbeitsrapport } from '../../api';
+import { downloadArbeitsrapport, markArbeitsrapportBilled } from '../../api';
 import { translateError } from '../../i18n';
 import type { Client } from '../../types';
 
@@ -42,6 +42,9 @@ export default function ArbeitsrapportModal({ clients, from, to, billable, bille
       a.download = `Arbeitsrapport-${rapportNr} ${client.name}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
+      // Erst nachdem die Datei vollständig angekommen ist als rapportiert markieren –
+      // schlägt der Download fehl, bleibt der Abrechnungsstatus unverändert.
+      await markArbeitsrapportBilled({ from, to, clientId: client.id, projectIds, billable, billed });
       onCreated?.();
       onClose();
     } catch (e) {

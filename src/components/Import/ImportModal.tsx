@@ -9,7 +9,7 @@ import {
   getClients, createClient,
   getProjects, createProject,
   getTasks, createTask,
-  getTimeEntries, createTimeEntry,
+  getTimeEntries, importTimeEntries,
 } from '../../api';
 import { formatDate } from '../../utils/dateLocale';
 import type { Client, Project, Task } from '../../types';
@@ -31,8 +31,6 @@ export default function ImportModal({ onClose, onDone }: Props) {
   const [dateMin, setDateMin] = useState('');
   const [dateMax, setDateMax] = useState('');
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [progressTotal, setProgressTotal] = useState(0);
   const [importedCount, setImportedCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
 
@@ -185,28 +183,24 @@ export default function ImportModal({ onClose, onDone }: Props) {
 
   const handleImport = useCallback(async () => {
     setBusy(true);
-    setProgressTotal(toImport.length);
-    setProgress(0);
-    let imported = 0;
-
     try {
-      for (const row of toImport) {
+      // Ein einziger Bulk-Request: der Server schreibt in einer Transaktion
+      // (alles oder nichts) und prüft Duplikate selbst – ein Retry nach einem
+      // Fehler kann daher keine Duplikate mehr erzeugen.
+      const payload = toImport.map(row => {
         const projectId = resolveProjectId(row);
-        const taskId = projectId ? resolveTaskId(row, projectId) : undefined;
-
-        await createTimeEntry({
+        return {
           description: row.beschreibung || undefined,
           project_id: projectId,
-          task_id: taskId,
+          task_id: projectId ? resolveTaskId(row, projectId) : undefined,
           start_time: row.startTime,
           end_time: row.endTime,
           is_billable: row.isBillable ? 1 : 0,
-        });
-        imported++;
-        setProgress(imported);
-      }
-      setImportedCount(imported);
-      setSkippedCount(toSkip);
+        };
+      });
+      const result = await importTimeEntries(payload);
+      setImportedCount(result.imported);
+      setSkippedCount(toSkip + result.skipped);
       setStep(5);
     } finally { setBusy(false); }
   }, [toImport, toSkip]); // eslint-disable-line
@@ -402,14 +396,9 @@ export default function ImportModal({ onClose, onDone }: Props) {
               </div>
 
               {busy && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs text-secondary">
-                    <span>{t('import.importing')}</span>
-                    <span>{progress} / {progressTotal}</span>
-                  </div>
-                  <div className="h-2 bg-background rounded-full overflow-hidden">
-                    <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${progressTotal > 0 ? (progress / progressTotal) * 100 : 0}%` }} />
-                  </div>
+                <div className="flex items-center gap-2 text-xs text-secondary">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>{t('import.importing')}</span>
                 </div>
               )}
 

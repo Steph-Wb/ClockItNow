@@ -69,6 +69,8 @@ export const updateTimeEntry = (id: number, data: Partial<TimeEntry>) =>
   req<TimeEntry>(`/api/time-entries/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteTimeEntry = (id: number) =>
   req<{ success: boolean }>(`/api/time-entries/${id}`, { method: 'DELETE' });
+export const importTimeEntries = (entries: Partial<TimeEntry>[]) =>
+  req<{ imported: number; skipped: number }>('/api/time-entries/import', { method: 'POST', body: JSON.stringify({ entries }) });
 
 // Tasks
 export const getTasks = (projectId: number) =>
@@ -127,3 +129,10 @@ export const downloadArbeitsrapport = async (params: {
   }
   return res.blob();
 };
+
+// Bestätigung nach erfolgreichem Download: Einträge des Rapports als rapportiert markieren
+export const markArbeitsrapportBilled = (params: {
+  from: string; to: string; clientId: number;
+  projectIds?: number[]; billable?: 'all' | 'billable' | 'non_billable'; billed?: 'all' | 'billed' | 'unbilled';
+}) =>
+  req<{ marked: number }>('/api/arbeitsrapport/mark-billed', { method: 'POST', body: JSON.stringify(params) });

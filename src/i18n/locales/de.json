@@ -319,7 +319,8 @@
     },
     "timeEntries": {
       "invalidTimestamp": "Ungültiger Zeitstempel",
-      "endBeforeStart": "Endzeit darf nicht vor der Startzeit liegen"
+      "endBeforeStart": "Endzeit darf nicht vor der Startzeit liegen",
+      "importInvalid": "Ungültige Import-Daten"
     },
     "arbeitsrapport": {
       "paramsRequired": "Von, Bis und Kunde sind erforderlich",

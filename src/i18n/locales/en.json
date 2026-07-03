@@ -319,7 +319,8 @@
     },
     "timeEntries": {
       "invalidTimestamp": "Invalid timestamp",
-      "endBeforeStart": "End time must not be before the start time"
+      "endBeforeStart": "End time must not be before the start time",
+      "importInvalid": "Invalid import data"
     },
     "arbeitsrapport": {
       "paramsRequired": "From, to and client are required",

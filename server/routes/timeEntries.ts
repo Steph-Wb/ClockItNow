@@ -85,6 +85,70 @@ router.post('/', (req: Request, res: Response) => {
   res.status(201).json(row);
 });
 
+/**
+ * Bulk-Import (alles oder nichts): validiert zuerst alle Zeilen, schreibt dann
+ * in einer Transaktion. Duplikate (gleicher Start + Beschreibung + Projekt)
+ * werden serverseitig übersprungen – auch innerhalb desselben Batches, da die
+ * Duplikatprüfung die eigenen, noch nicht committeten Inserts bereits sieht.
+ */
+router.post('/import', (req: Request, res: Response) => {
+  const { entries } = req.body;
+  if (!Array.isArray(entries)) {
+    return res.status(400).json({ error: 'errors.timeEntries.importInvalid' });
+  }
+  const userId = uid(req);
+
+  // Phase 1: alles validieren und normalisieren – bei Fehlern wird nichts geschrieben
+  const normalized: {
+    description: string | null; project_id: number | null; task_id: number | null;
+    start: string; end: string; billable: number;
+  }[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i] ?? {};
+    if (!isValidTimestamp(e.start_time) || !isValidTimestamp(e.end_time)) {
+      return res.status(400).json({ error: 'errors.timeEntries.invalidTimestamp', row: i + 1 });
+    }
+    if (Date.parse(e.end_time) < Date.parse(e.start_time)) {
+      return res.status(400).json({ error: 'errors.timeEntries.endBeforeStart', row: i + 1 });
+    }
+    normalized.push({
+      description: e.description ?? null,
+      project_id: e.project_id != null ? Number(e.project_id) : null,
+      task_id: e.task_id != null ? Number(e.task_id) : null,
+      start: new Date(e.start_time).toISOString(),
+      end: new Date(e.end_time).toISOString(),
+      billable: e.is_billable !== undefined ? Number(e.is_billable) : 1,
+    });
+  }
+
+  const dupCheck = db.prepare(`
+    SELECT 1 FROM time_entries
+    WHERE user_id = ? AND start_time = ?
+      AND IFNULL(description, '') = ? AND IFNULL(project_id, -1) = ?
+    LIMIT 1
+  `);
+  const insert = db.prepare(
+    'INSERT INTO time_entries (description, project_id, task_id, start_time, end_time, is_billable, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  );
+
+  // Phase 2: Transaktion – bei einem Fehler bleibt die Datenbank unverändert
+  let imported = 0;
+  let skipped = 0;
+  db.exec('BEGIN');
+  try {
+    for (const n of normalized) {
+      if (dupCheck.get(userId, n.start, n.description ?? '', n.project_id ?? -1)) { skipped++; continue; }
+      insert.run(n.description, n.project_id, n.task_id, n.start, n.end, n.billable, userId);
+      imported++;
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+  res.status(201).json({ imported, skipped });
+});
+
 router.put('/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM time_entries WHERE id = ? AND user_id = ?').get(Number(id), uid(req)) as any;
