@@ -69,6 +69,8 @@ export const updateTimeEntry = (id: number, data: Partial<TimeEntry>) =>
   req<TimeEntry>(`/api/time-entries/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteTimeEntry = (id: number) =>
   req<{ success: boolean }>(`/api/time-entries/${id}`, { method: 'DELETE' });
+export const importTimeEntries = (entries: Partial<TimeEntry>[]) =>
+  req<{ imported: number; skipped: number }>('/api/time-entries/import', { method: 'POST', body: JSON.stringify({ entries }) });
 
 // Tasks
 export const getTasks = (projectId: number) =>
@@ -110,13 +112,16 @@ export const updateSettings = (data: AppSettings) =>
 
 // Arbeitsrapport (binärer Download)
 export const downloadArbeitsrapport = async (params: {
-  from: string; to: string; clientId: number; projektText?: string; rapportNr?: string; lang?: string; includeBilled?: boolean;
+  from: string; to: string; clientId: number; projektText?: string; rapportNr?: string; lang?: string;
+  projectIds?: number[]; billable?: 'all' | 'billable' | 'non_billable'; billed?: 'all' | 'billed' | 'unbilled';
 }): Promise<Blob> => {
   const qs = new URLSearchParams({ from: params.from, to: params.to, clientId: String(params.clientId) });
   if (params.projektText) qs.set('projektText', params.projektText);
   if (params.rapportNr) qs.set('rapportNr', params.rapportNr);
   if (params.lang) qs.set('lang', params.lang);
-  if (params.includeBilled) qs.set('includeBilled', 'true');
+  if (params.projectIds && params.projectIds.length) qs.set('projectIds', params.projectIds.join(','));
+  if (params.billable && params.billable !== 'all') qs.set('billable', params.billable);
+  if (params.billed && params.billed !== 'all') qs.set('billed', params.billed);
   const res = await fetch(`/api/arbeitsrapport?${qs}`, { credentials: 'include' });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -124,3 +129,10 @@ export const downloadArbeitsrapport = async (params: {
   }
   return res.blob();
 };
+
+// Bestätigung nach erfolgreichem Download: Einträge des Rapports als rapportiert markieren
+export const markArbeitsrapportBilled = (params: {
+  from: string; to: string; clientId: number;
+  projectIds?: number[]; billable?: 'all' | 'billable' | 'non_billable'; billed?: 'all' | 'billed' | 'unbilled';
+}) =>
+  req<{ marked: number }>('/api/arbeitsrapport/mark-billed', { method: 'POST', body: JSON.stringify(params) });

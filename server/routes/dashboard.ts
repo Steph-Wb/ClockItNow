@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../database.js';
-import { getUserTimezone, localDateKey, addDaysKey, utcWindowForLocalRange } from '../lib/timezone.js';
+import { getUserTimezone, localDateKey, addDaysKey, utcWindowForLocalRange, parseDateKey } from '../lib/timezone.js';
 
 const router = Router();
 
@@ -49,7 +49,15 @@ router.get('/', (req: Request, res: Response) => {
   const { period = 'this_week', from, to } = req.query;
   const userId = (req as any).user.id as number;
   const tz = getUserTimezone(userId);
-  const { fromKey, toKey } = getPeriodRange(period as string, tz, from as string, to as string);
+
+  // from/to (nur bei period=custom relevant) müssen, falls angegeben, gültige Keys sein
+  const fromParam = from !== undefined ? parseDateKey(from) : undefined;
+  const toParam = to !== undefined ? parseDateKey(to) : undefined;
+  if (fromParam === null || toParam === null) {
+    return res.status(400).json({ error: 'errors.invalidDateRange' });
+  }
+
+  const { fromKey, toKey } = getPeriodRange(period as string, tz, fromParam, toParam);
   // SQL großzügig in UTC filtern; die exakte lokale Tagesgrenze ziehen wir unten in JS.
   const { start, end } = utcWindowForLocalRange(fromKey, toKey);
 

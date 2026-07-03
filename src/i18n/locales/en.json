@@ -122,6 +122,9 @@
     "colZipCity": "ZIP / City",
     "colPostfix": "Postfix",
     "colDescription": "Report description",
+    "colRounding": "Rounding",
+    "roundingUp": "Round up",
+    "roundingDown": "Round down",
     "colCurrency": "Currency",
     "noClients": "No clients",
     "streetPlaceholder": "Street and No.",
@@ -213,12 +216,10 @@
   "arbeitsrapport": {
     "createButton": "Work report (.xlsx)",
     "modalTitle": "Create work report",
-    "clientLabel": "Client *",
-    "clientPlaceholder": "Select client",
+    "clientLabel": "Client",
     "projektLabel": "Project / Description",
     "projektPlaceholder": "e.g. Various tasks according to the list \"abas support daily\"",
-    "includeBilledLabel": "Include already billed times",
-    "includeBilledHint": "By default only times not yet reported are included. Created times are marked as billed.",
+    "singleClientRequired": "Exactly one client must be selected in the Reports filters to create a work report.",
     "rapportNrLabel": "Report No.:",
     "periodLabel": "Period:",
     "createError": "Error creating report",
@@ -296,6 +297,8 @@
   "errors": {
     "requestFailed": "Request failed",
     "loadFailed": "Failed to load",
+    "internal": "Internal server error",
+    "invalidDateRange": "Invalid date range (expected format: YYYY-MM-DD)",
     "notFound": "Not found",
     "nameRequired": "Name is required",
     "projectIdRequired": "projectId is required",
@@ -317,9 +320,18 @@
       "linkExpired": "Link expired",
       "userNotFound": "User not found"
     },
+    "timeEntries": {
+      "invalidTimestamp": "Invalid timestamp",
+      "endBeforeStart": "End time must not be before the start time",
+      "importInvalid": "Invalid import data"
+    },
+    "clients": {
+      "invalidRounding": "Invalid rounding rule (step 5/10/15, direction up/down)"
+    },
     "arbeitsrapport": {
       "paramsRequired": "From, to and client are required",
-      "clientNotFound": "Client not found"
+      "clientNotFound": "Client not found",
+      "invalidDateRange": "Invalid date range (expected format: YYYY-MM-DD)"
     }
   }
 }

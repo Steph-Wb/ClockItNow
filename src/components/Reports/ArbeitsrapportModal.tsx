@@ -2,55 +2,49 @@ import { useState } from 'react';
 import { X, FileSpreadsheet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n/config';
-import { downloadArbeitsrapport } from '../../api';
+import { downloadArbeitsrapport, markArbeitsrapportBilled } from '../../api';
 import { translateError } from '../../i18n';
 import type { Client } from '../../types';
 
 interface Props {
-  clients: Client[];
+  clients: Client[]; // die aktuell in den Berichte-Filtern selektierten Kunden (muss genau 1 sein)
   from: string;
   to: string;
-  defaultClientId?: number;
-  defaultProjekt?: string;
+  billable: 'all' | 'billable' | 'non_billable';
+  billed: 'all' | 'billed' | 'unbilled';
+  projectIds: number[];
   onClose: () => void;
   onCreated?: () => void;
 }
 
-export default function ArbeitsrapportModal({ clients, from, to, defaultClientId, defaultProjekt, onClose, onCreated }: Props) {
+export default function ArbeitsrapportModal({ clients, from, to, billable, billed, projectIds, onClose, onCreated }: Props) {
   const { t } = useTranslation();
-  const initialClientId = defaultClientId ?? clients[0]?.id;
-  const initialClient = clients.find(c => c.id === initialClientId);
-  const [clientId, setClientId] = useState<number | undefined>(initialClientId);
-  const [projekt, setProjekt] = useState(defaultProjekt ?? initialClient?.rapport_description ?? '');
-  const [includeBilled, setIncludeBilled] = useState(false);
+  const client = clients.length === 1 ? clients[0] : undefined;
+  const invalidSelection = clients.length !== 1;
+  const [projekt, setProjekt] = useState(client?.rapport_description ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const onClientChange = (id: number | undefined) => {
-    setClientId(id);
-    const desc = clients.find(c => c.id === id)?.rapport_description ?? '';
-    setProjekt(desc);
-  };
-
   const toDate = new Date(to);
   const monthPart = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}`;
-  const selectedClient = clients.find(c => c.id === clientId);
-  const postfix = selectedClient?.rapport_postfix != null ? `.${String(selectedClient.rapport_postfix).padStart(2, '0')}` : '';
+  const postfix = client?.rapport_postfix != null ? `.${String(client.rapport_postfix).padStart(2, '0')}` : '';
   const rapportNr = `${monthPart}${postfix}`;
 
   const handleCreate = async () => {
-    if (!clientId) return;
+    if (!client) return;
     setBusy(true);
     setError(null);
     try {
-      const blob = await downloadArbeitsrapport({ from, to, clientId, projektText: projekt, rapportNr, lang: i18n.language, includeBilled });
-      const clientName = clients.find(c => c.id === clientId)?.name ?? '';
+      const blob = await downloadArbeitsrapport({ from, to, clientId: client.id, projektText: projekt, rapportNr, lang: i18n.language, projectIds, billable, billed });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Arbeitsrapport-${rapportNr} ${clientName}.xlsx`;
+      a.download = `Arbeitsrapport-${rapportNr} ${client.name}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
+      // Erst nachdem die Datei vollständig angekommen ist als rapportiert markieren –
+      // schlägt der Download fehl, bleibt der Abrechnungsstatus unverändert.
+      await markArbeitsrapportBilled({ from, to, clientId: client.id, projectIds, billable, billed });
       onCreated?.();
       onClose();
     } catch (e) {
@@ -67,37 +61,31 @@ export default function ArbeitsrapportModal({ clients, from, to, defaultClientId
           <h2 className="font-semibold text-primary">{t('arbeitsrapport.modalTitle')}</h2>
           <button onClick={onClose} className="text-secondary hover:text-primary"><X size={18} /></button>
         </div>
-        <div className="px-5 py-4 space-y-4">
-          <div>
-            <label className="text-xs text-secondary mb-1.5 block">{t('arbeitsrapport.clientLabel')}</label>
-            <select value={clientId ?? ''} onChange={e => onClientChange(e.target.value ? Number(e.target.value) : undefined)}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent">
-              <option value="">{t('arbeitsrapport.clientPlaceholder')}</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+        {invalidSelection ? (
+          <div className="px-5 py-4">
+            <p className="text-sm text-red-400">{t('arbeitsrapport.singleClientRequired')}</p>
           </div>
-          <div>
-            <label className="text-xs text-secondary mb-1.5 block">{t('arbeitsrapport.projektLabel')}</label>
-            <textarea value={projekt} onChange={e => setProjekt(e.target.value)} rows={2}
-              placeholder={t('arbeitsrapport.projektPlaceholder')}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent resize-none" />
+        ) : (
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <label className="text-xs text-secondary mb-1.5 block">{t('arbeitsrapport.clientLabel')}</label>
+              <div className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary">{client!.name}</div>
+            </div>
+            <div>
+              <label className="text-xs text-secondary mb-1.5 block">{t('arbeitsrapport.projektLabel')}</label>
+              <textarea value={projekt} onChange={e => setProjekt(e.target.value)} rows={2}
+                placeholder={t('arbeitsrapport.projektPlaceholder')}
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent resize-none" />
+            </div>
+            <div className="text-xs text-secondary">
+              {t('arbeitsrapport.rapportNrLabel')} <span className="text-primary font-medium">{rapportNr}</span> · {t('arbeitsrapport.periodLabel')} {from} – {to}
+            </div>
+            {error && <p className="text-xs text-red-400">{error}</p>}
           </div>
-          <label className="flex items-start gap-2.5 cursor-pointer">
-            <input type="checkbox" checked={includeBilled} onChange={e => setIncludeBilled(e.target.checked)}
-              className="mt-0.5 accent-accent" />
-            <span className="text-xs text-secondary">
-              <span className="text-primary">{t('arbeitsrapport.includeBilledLabel')}</span><br />
-              {t('arbeitsrapport.includeBilledHint')}
-            </span>
-          </label>
-          <div className="text-xs text-secondary">
-            {t('arbeitsrapport.rapportNrLabel')} <span className="text-primary font-medium">{rapportNr}</span> · {t('arbeitsrapport.periodLabel')} {from} – {to}
-          </div>
-          {error && <p className="text-xs text-red-400">{error}</p>}
-        </div>
+        )}
         <div className="flex justify-end gap-3 px-5 py-4 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 text-sm text-secondary hover:text-primary">{t('common.cancel')}</button>
-          <button onClick={handleCreate} disabled={busy || !clientId}
+          <button onClick={handleCreate} disabled={busy || invalidSelection}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg disabled:opacity-50">
             <FileSpreadsheet size={15} /> {busy ? t('arbeitsrapport.creating') : t('arbeitsrapport.createXlsx')}
           </button>

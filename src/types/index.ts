@@ -6,6 +6,8 @@ export interface Client {
   zip_city?: string;
   rapport_postfix?: number;
   rapport_description?: string;
+  rounding_step?: number;
+  rounding_mode?: 'up' | 'down';
   currency: string;
   is_active: number;
   created_at: string;

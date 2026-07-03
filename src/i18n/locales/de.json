@@ -122,6 +122,9 @@
     "colZipCity": "PLZ / Ort",
     "colPostfix": "Postfix",
     "colDescription": "Rapport-Beschreibung",
+    "colRounding": "Rundung",
+    "roundingUp": "Aufrunden",
+    "roundingDown": "Abrunden",
     "colCurrency": "Währung",
     "noClients": "Keine Kunden",
     "streetPlaceholder": "Strasse und Nr.",
@@ -213,12 +216,10 @@
   "arbeitsrapport": {
     "createButton": "Arbeitsrapport (.xlsx)",
     "modalTitle": "Arbeitsrapport erstellen",
-    "clientLabel": "Kunde *",
-    "clientPlaceholder": "Kunde wählen",
+    "clientLabel": "Kunde",
     "projektLabel": "Projekt / Beschreibung",
     "projektPlaceholder": "z.B. Diverse Aufträge gemäss der Liste \"abas support daily\"",
-    "includeBilledLabel": "Bereits abgerechnete Zeiten einbeziehen",
-    "includeBilledHint": "Standardmässig werden nur noch nicht rapportierte Zeiten aufgenommen. Erstellte Zeiten werden als abgerechnet markiert.",
+    "singleClientRequired": "Für den Arbeitsrapport muss in den Berichte-Filtern genau ein Kunde ausgewählt sein.",
     "rapportNrLabel": "Rapport-Nr.:",
     "periodLabel": "Zeitraum:",
     "createError": "Fehler bei der Erstellung",
@@ -296,6 +297,8 @@
   "errors": {
     "requestFailed": "Anfrage fehlgeschlagen",
     "loadFailed": "Fehler beim Laden",
+    "internal": "Interner Serverfehler",
+    "invalidDateRange": "Ungültiger Datumsbereich (erwartetes Format: YYYY-MM-DD)",
     "notFound": "Nicht gefunden",
     "nameRequired": "Name ist erforderlich",
     "projectIdRequired": "projectId erforderlich",
@@ -317,9 +320,18 @@
       "linkExpired": "Link abgelaufen",
       "userNotFound": "Benutzer nicht gefunden"
     },
+    "timeEntries": {
+      "invalidTimestamp": "Ungültiger Zeitstempel",
+      "endBeforeStart": "Endzeit darf nicht vor der Startzeit liegen",
+      "importInvalid": "Ungültige Import-Daten"
+    },
+    "clients": {
+      "invalidRounding": "Ungültige Rundungsregel (Raster 5/10/15, Richtung auf/ab)"
+    },
     "arbeitsrapport": {
       "paramsRequired": "Von, Bis und Kunde sind erforderlich",
-      "clientNotFound": "Kunde nicht gefunden"
+      "clientNotFound": "Kunde nicht gefunden",
+      "invalidDateRange": "Ungültiger Datumsbereich (erwartetes Format: YYYY-MM-DD)"
     }
   }
 }

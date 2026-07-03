@@ -1,4 +1,6 @@
 import ExcelJS from 'exceljs';
+import { localDateKey } from './timezone.js';
+import { DEFAULT_ROUNDING, normalizeRoundingRule, roundDurationsCapped, RoundingRule } from './rounding.js';
 
 export interface RapportEntry {
   start_time: string;
@@ -16,6 +18,8 @@ export interface BuildArbeitsrapportOptions {
   rapportNr: string;          // 'YYYY-MM'
   datum: string;              // Erstellungsdatum 'dd.mm.yyyy'
   lang?: 'de' | 'en';        // Sprache der xlsx-Labels (Default: 'de')
+  tz: string;                 // IANA-Zeitzone für die Tages-Gruppierung/-Formatierung
+  rounding?: RoundingRule;    // Rundungsregel des Kunden (Default: 15 min aufrunden)
 }
 
 /** Serverseitige Label-Map (gespiegelt zu arbeitsrapport.xlsx.* in den JSON-Dateien) */
@@ -71,7 +75,8 @@ const LABELS: Record<'de' | 'en', {
 
 interface DayRow {
   date: string;               // 'dd.mm.yyyy'
-  dauer: number;              // Dezimalstunden, 0.25-Schritte
+  rawSeconds: number;         // exakte Dauer; Rundung passiert global über alle Blöcke
+  dauer: number;              // Dezimalstunden nach Rundungsregel (wird nachträglich gesetzt)
   taetigkeit: string;         // mehrzeilig
   sum: number;                // kumuliert innerhalb des Projektblocks
 }
@@ -82,50 +87,40 @@ interface ProjectBlock {
   subtotal: number;
 }
 
-/** dd.mm.yyyy aus ISO-Datum */
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
+/** 'dd.mm.yyyy' aus lokalem Datums-Key 'YYYY-MM-DD' */
+function keyToDisplay(key: string): string {
+  const [y, m, d] = key.split('-');
+  return `${d}.${m}.${y}`;
 }
 
-/** Auf 0.25-Schritte runden */
-function roundQuarter(hours: number): number {
-  return Math.round(hours * 4) / 4;
-}
-
-/** Einträge pro Kalendertag gruppieren; Kumulation innerhalb des Blocks */
-function groupByDay(entries: RapportEntry[]): DayRow[] {
-  const map = new Map<string, { seconds: number; descriptions: string[]; firstIso: string }>();
+/** Einträge pro Kalendertag (in der Zeitzone tz) gruppieren; Rundung/Kumulation folgen später */
+function groupByDay(entries: RapportEntry[], tz: string): DayRow[] {
+  const map = new Map<string, { seconds: number; descriptions: string[] }>();
 
   for (const e of entries) {
     if (!e.end_time) continue;
-    const start = new Date(e.start_time);
-    const key = `${start.getFullYear()}-${start.getMonth()}-${start.getDate()}`;
-    const secs = (new Date(e.end_time).getTime() - start.getTime()) / 1000;
-    const entry = map.get(key) ?? { seconds: 0, descriptions: [], firstIso: e.start_time };
+    const key = localDateKey(e.start_time, tz);
+    const secs = (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 1000;
+    const entry = map.get(key) ?? { seconds: 0, descriptions: [] };
     entry.seconds += secs;
     const desc = (e.description ?? '').trim();
     if (desc && !entry.descriptions.includes(desc)) entry.descriptions.push(desc);
     map.set(key, entry);
   }
 
-  const rows: DayRow[] = [...map.values()]
-    .sort((a, b) => new Date(a.firstIso).getTime() - new Date(b.firstIso).getTime())
-    .map(v => ({
-      date: fmtDate(v.firstIso),
-      dauer: roundQuarter(v.seconds / 3600),
+  return [...map.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)) // 'YYYY-MM-DD' sortiert chronologisch
+    .map(([key, v]) => ({
+      date: keyToDisplay(key),
+      rawSeconds: v.seconds,
+      dauer: 0,
       taetigkeit: v.descriptions.join('\n'),
       sum: 0,
     }));
-
-  let running = 0;
-  for (const r of rows) { running += r.dauer; r.sum = running; }
-  return rows;
 }
 
 /** Einträge nach Projekt (in Reihenfolge des ersten Auftretens) gruppieren */
-function groupByProject(entries: RapportEntry[]): ProjectBlock[] {
+function groupByProject(entries: RapportEntry[], tz: string): ProjectBlock[] {
   const order: string[] = [];
   const map = new Map<string, RapportEntry[]>();
   for (const e of entries) {
@@ -133,10 +128,22 @@ function groupByProject(entries: RapportEntry[]): ProjectBlock[] {
     if (!map.has(name)) { map.set(name, []); order.push(name); }
     map.get(name)!.push(e);
   }
-  return order.map(name => {
-    const days = groupByDay(map.get(name)!);
-    return { projectName: name, days, subtotal: days.reduce((s, d) => s + d.dauer, 0) };
-  });
+  return order.map(name => ({ projectName: name, days: groupByDay(map.get(name)!, tz), subtotal: 0 }));
+}
+
+/**
+ * Rundet alle Tageszeilen (blockübergreifend) nach der Kundenregel mit
+ * gedeckelter Gesamtsumme und berechnet Laufsummen/Zwischentotale neu.
+ */
+function applyRounding(blocks: ProjectBlock[], rule: RoundingRule): void {
+  const allDays = blocks.flatMap(b => b.days);
+  const rounded = roundDurationsCapped(allDays.map(d => d.rawSeconds), rule);
+  allDays.forEach((d, i) => { d.dauer = rounded[i] / 3600; });
+  for (const b of blocks) {
+    let running = 0;
+    for (const d of b.days) { running += d.dauer; d.sum = running; }
+    b.subtotal = running;
+  }
 }
 
 const GREY = 'FFF2F2F2';
@@ -150,11 +157,17 @@ export function buildArbeitsrapportWorkbook(opts: BuildArbeitsrapportOptions): E
   const L = LABELS[opts.lang ?? 'de'];
 
   // Resolve no-project placeholder to localized label
-  const blocks_raw = groupByProject(opts.entries);
+  const blocks_raw = groupByProject(opts.entries, opts.tz);
   const resolvedBlocks = blocks_raw.map(b => ({
     ...b,
     projectName: b.projectName === '__NO_PROJECT__' ? L.noProject : b.projectName,
   }));
+
+  // Rundungsregel des Kunden anwenden (Deckelung über alle Blöcke hinweg)
+  const rule = opts.rounding
+    ? normalizeRoundingRule(opts.rounding.stepMinutes, opts.rounding.mode)
+    : DEFAULT_ROUNDING;
+  applyRounding(resolvedBlocks, rule);
 
   const wb = new ExcelJS.Workbook();
   wb.creator = 'ClockItNow';

@@ -23,22 +23,60 @@ export interface ParseResult {
   dateMax: string;  // ISO
 }
 
+/**
+ * RFC-4180-Tokenizer für ';'-getrennte Clockify-Exporte.
+ * Behandelt gequotete Felder korrekt: Semikolons, Zeilenumbrüche und
+ * verdoppelte Anführungszeichen ("") innerhalb eines Felds bleiben erhalten –
+ * ein naives split(';') würde hier die Spalten verschieben.
+ */
+function tokenizeCSV(text: string, delim = ';'): string[][] {
+  const records: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }  // escaped quote
+        else inQuotes = false;
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"' && field === '') {
+      inQuotes = true;
+    } else if (ch === delim) {
+      row.push(field); field = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      records.push(row); row = [];
+    } else {
+      field += ch;
+    }
+  }
+  if (field !== '' || row.length) { row.push(field); records.push(row); }
+
+  // Komplett leere Zeilen (z. B. trailing newlines) verwerfen
+  return records.filter(r => r.some(f => f.trim() !== ''));
+}
+
 export function parseClockifyCSV(text: string): ParseResult {
   // Strip BOM if present
   const clean = text.replace(/^﻿/, '');
-  const lines = clean.split(/\r?\n/).filter(l => l.trim());
+  const records = tokenizeCSV(clean);
 
-  if (lines.length < 2) {
+  if (records.length < 2) {
     return { rows: [], errors: ['Die Datei enthält keine Datenzeilen.'], dateMin: '', dateMax: '' };
   }
 
   const rows: ClockifyRow[] = [];
   const errors: string[] = [];
 
-  // Skip header (line 0), parse from line 1
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    const cols = line.split(';');
+  // Skip header (record 0), parse from record 1
+  for (let i = 1; i < records.length; i++) {
+    const cols = records[i];
 
     // Expect at least 16 columns
     if (cols.length < 16) {
@@ -58,6 +96,10 @@ export function parseClockifyCSV(text: string): ParseResult {
         hourlyRate:   parseFloat((cols[15]?.trim() ?? '0').replace(',', '.')) || 0,
       };
       if (!row.projektName) { errors.push(`Zeile ${i + 1}: kein Projektname`); continue; }
+      if (new Date(row.endTime).getTime() < new Date(row.startTime).getTime()) {
+        errors.push(`Zeile ${i + 1}: Endzeit liegt vor der Startzeit`);
+        continue;
+      }
       rows.push(row);
     } catch (e) {
       errors.push(`Zeile ${i + 1}: ${e instanceof Error ? e.message : 'Fehler'}`);

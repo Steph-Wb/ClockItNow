@@ -21,6 +21,22 @@ export function getUserTimezone(userId: number): string {
   return tz && isValidTimeZone(tz) ? tz : DEFAULT_TIMEZONE;
 }
 
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Validiert einen Datums-Query-Parameter ('YYYY-MM-DD', echtes Kalenderdatum).
+ * Liefert den Key zurück oder null – unnormalisierte ('2026-7-1') und unmögliche
+ * Daten ('2026-02-30') würden in addDaysKey/localDateKey werfen bzw. die
+ * lexikalischen Vergleiche verfälschen.
+ */
+export function parseDateKey(v: unknown): string | null {
+  if (typeof v !== 'string' || !DATE_KEY_RE.test(v)) return null;
+  // Roundtrip-Check: V8 akzeptiert Tages-Überläufe ('2026-02-30' → 2. März),
+  // daher reicht Date.parse nicht – das Datum muss sich selbst reproduzieren.
+  const d = new Date(v + 'T00:00:00Z');
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : null;
+}
+
 // Intl.DateTimeFormat ist teuer zu erzeugen – pro Zeitzone cachen.
 const fmtCache = new Map<string, Intl.DateTimeFormat>();
 

@@ -48,6 +48,8 @@ export function initDatabase(): void {
       zip_city TEXT,
       rapport_postfix INTEGER,
       rapport_description TEXT,
+      rounding_step INTEGER DEFAULT 15,
+      rounding_mode TEXT DEFAULT 'up',
       currency TEXT DEFAULT 'CHF',
       is_active INTEGER DEFAULT 1,
       user_id INTEGER REFERENCES users(id),
@@ -138,4 +140,11 @@ export function initDatabase(): void {
   // Zeitstempel, wann ein Eintrag in einem Arbeitsrapport abgerechnet/rapportiert wurde (NULL = noch offen)
   if (!hasColumn('time_entries', 'billed_at'))
     db.exec(`ALTER TABLE time_entries ADD COLUMN billed_at TEXT`);
+
+  // Rundungsregel pro Kunde für den Arbeitsrapport (Raster in Minuten + Richtung)
+  if (!hasColumn('clients', 'rounding_step'))
+    db.exec(`ALTER TABLE clients ADD COLUMN rounding_step INTEGER DEFAULT 15`);
+
+  if (!hasColumn('clients', 'rounding_mode'))
+    db.exec(`ALTER TABLE clients ADD COLUMN rounding_mode TEXT DEFAULT 'up'`);
 }

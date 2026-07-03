@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../database.js';
-import { getUserTimezone, localDateKey, utcWindowForLocalRange } from '../lib/timezone.js';
+import { getUserTimezone, localDateKey, utcWindowForLocalRange, parseDateKey } from '../lib/timezone.js';
 
 const router = Router();
 
@@ -20,11 +20,14 @@ router.get('/', (req: Request, res: Response) => {
     LEFT JOIN clients c ON p.client_id = c.id
     WHERE te.user_id = ? AND te.end_time IS NOT NULL
   `;
-  const params: unknown[] = [userId];
+  const params: (string | number)[] = [userId];
 
   // SQL großzügig in UTC vorfiltern; die exakte lokale Tagesgrenze wird unten in JS gezogen.
-  const fromKey = from as string | undefined;
-  const toKey = to as string | undefined;
+  const fromKey = from !== undefined ? parseDateKey(from) : undefined;
+  const toKey = to !== undefined ? parseDateKey(to) : undefined;
+  if (fromKey === null || toKey === null) {
+    return res.status(400).json({ error: 'errors.invalidDateRange' });
+  }
   if (fromKey && toKey) {
     const { start, end } = utcWindowForLocalRange(fromKey, toKey);
     sql += ' AND te.start_time >= ? AND te.start_time <= ?';

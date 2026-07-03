@@ -7,6 +7,8 @@ export function useTimer(onStop?: () => void) {
   const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Guard gegen Doppelklick: verhindert zwei parallele Start-/Stop-Requests
+  const pendingRef = useRef(false);
 
   const startInterval = useCallback((entry: TimeEntry) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -33,26 +35,37 @@ export function useTimer(onStop?: () => void) {
     isBillable = true,
     taskId?: number,
   ) => {
-    const entry = await createTimeEntry({
-      description: description || undefined,
-      project_id: projectId,
-      task_id: taskId,
-      start_time: new Date().toISOString(),
-      is_billable: isBillable ? 1 : 0,
-    });
-    setActiveEntry(entry);
-    setElapsed(0);
-    startInterval(entry);
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    try {
+      const entry = await createTimeEntry({
+        description: description || undefined,
+        project_id: projectId,
+        task_id: taskId,
+        start_time: new Date().toISOString(),
+        is_billable: isBillable ? 1 : 0,
+      });
+      setActiveEntry(entry);
+      setElapsed(0);
+      startInterval(entry);
+    } finally {
+      pendingRef.current = false;
+    }
   }, [startInterval]);
 
   const stopTimer = useCallback(async () => {
-    if (!activeEntry) return;
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = null;
-    await updateTimeEntry(activeEntry.id, { end_time: new Date().toISOString() });
-    setActiveEntry(null);
-    setElapsed(0);
-    onStop?.();
+    if (!activeEntry || pendingRef.current) return;
+    pendingRef.current = true;
+    try {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      await updateTimeEntry(activeEntry.id, { end_time: new Date().toISOString() });
+      setActiveEntry(null);
+      setElapsed(0);
+      onStop?.();
+    } finally {
+      pendingRef.current = false;
+    }
   }, [activeEntry, onStop]);
 
   const updateStartTime = useCallback(async (newStartTime: string) => {

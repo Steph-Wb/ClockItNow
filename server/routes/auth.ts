@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { db } from '../database.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 
 const router = Router();
 
@@ -46,7 +47,7 @@ router.get('/status', (req: Request, res: Response) => {
 });
 
 // ── POST /api/auth/register ──────────────────────────────────────────────────
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', asyncHandler(async (req: Request, res: Response) => {
   const existing = db.prepare('SELECT id FROM users LIMIT 1').get();
   if (existing) { res.status(403).json({ error: 'errors.auth.userExists' }); return; }
 
@@ -66,10 +67,10 @@ router.post('/register', async (req: Request, res: Response) => {
 
   setSessionCookie(res, userId, email.trim());
   res.status(201).json({ ok: true, email: email.trim() });
-});
+}));
 
 // ── POST /api/auth/login ─────────────────────────────────────────────────────
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
   if (!email || !password) { res.status(400).json({ error: 'errors.auth.emailPasswordRequired' }); return; }
 
@@ -81,7 +82,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
   setSessionCookie(res, user.id, user.email);
   res.json({ ok: true, email: user.email });
-});
+}));
 
 // ── POST /api/auth/logout ────────────────────────────────────────────────────
 router.post('/logout', (_req: Request, res: Response) => {
@@ -90,7 +91,7 @@ router.post('/logout', (_req: Request, res: Response) => {
 });
 
 // ── POST /api/auth/magic-link ────────────────────────────────────────────────
-router.post('/magic-link', async (req: Request, res: Response) => {
+router.post('/magic-link', asyncHandler(async (req: Request, res: Response) => {
   const { email } = req.body;
   if (!email) { res.status(400).json({ error: 'errors.auth.emailRequired' }); return; }
 
@@ -129,7 +130,7 @@ router.post('/magic-link', async (req: Request, res: Response) => {
     console.error('SMTP-Fehler:', err);
     res.status(500).json({ error: 'errors.auth.emailSendFailed' });
   }
-});
+}));
 
 // ── GET /api/auth/magic-link/verify ─────────────────────────────────────────
 router.get('/magic-link/verify', (req: Request, res: Response) => {
