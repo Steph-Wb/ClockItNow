@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../database.js';
 import { buildArbeitsrapportWorkbook } from '../lib/buildArbeitsrapport.js';
 import { getUserTimezone, localDateKey, utcWindowForLocalRange } from '../lib/timezone.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 
 const router = Router();
 const uid = (req: Request) => (req as any).user.id as number;
@@ -52,10 +53,15 @@ function loadEntries(
   });
 }
 
-router.get('/', async (req: Request, res: Response) => {
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const { from, to, clientId, projektText, rapportNr, lang, projectIds, billable, billed } = req.query;
   if (!from || !to || !clientId) {
     return res.status(400).json({ error: 'errors.arbeitsrapport.paramsRequired' });
+  }
+  if (!DATE_KEY.test(from as string) || !DATE_KEY.test(to as string)) {
+    return res.status(400).json({ error: 'errors.arbeitsrapport.invalidDateRange' });
   }
   const userId = uid(req);
   const tz = getUserTimezone(userId);
@@ -99,20 +105,26 @@ router.get('/', async (req: Request, res: Response) => {
     lang: (lang === 'en' ? 'en' : 'de'),
   });
 
-  // Die in diesen Rapport eingeflossenen, noch offenen Einträge als rapportiert markieren.
+  // Erst den Rapport fertig erzeugen – schlägt das fehl, bleibt billed_at unberührt.
+  const buffer = await wb.xlsx.writeBuffer();
+
+  // Die eingeflossenen, noch offenen Einträge als rapportiert markieren –
+  // atomar in einem einzigen UPDATE (alles oder nichts).
   const toMark = entries.filter(e => !e.billed_at).map(e => e.id as number);
   if (toMark.length) {
-    const stmt = db.prepare(`UPDATE time_entries SET billed_at = datetime('now') WHERE id = ? AND user_id = ?`);
-    for (const id of toMark) stmt.run(id, userId);
+    db.prepare(
+      `UPDATE time_entries SET billed_at = datetime('now')
+       WHERE user_id = ? AND billed_at IS NULL AND id IN (${toMark.map(() => '?').join(',')})`
+    ).run(userId, ...toMark);
   }
 
-  const buffer = await wb.xlsx.writeBuffer();
   const senderPart = settings.sender_name ? ` ${settings.sender_name}` : '';
-  const filename = `Arbeitsrapport-${nr}${senderPart}.xlsx`;
+  // Steuer- und Anführungszeichen entfernen, sonst wirft res.setHeader
+  const filename = `Arbeitsrapport-${nr}${senderPart}.xlsx`.replace(/["\\\r\n\t]|[\x00-\x1f]/g, '');
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.send(Buffer.from(buffer));
-});
+}));
 
 export default router;
