@@ -46,7 +46,7 @@ router.get('/active', (req: Request, res: Response) => {
 router.get('/', (req: Request, res: Response) => {
   const { start, end, clientId, projectId } = req.query;
   let sql = `${SELECT_WITH_JOINS} WHERE te.user_id = ?`;
-  const params: unknown[] = [uid(req)];
+  const params: (string | number)[] = [uid(req)];
   if (start) { sql += ' AND te.start_time >= ?'; params.push(start as string); }
   if (end) { sql += ' AND te.start_time <= ?'; params.push(end as string); }
   if (projectId) { sql += ' AND te.project_id = ?'; params.push(Number(projectId)); }

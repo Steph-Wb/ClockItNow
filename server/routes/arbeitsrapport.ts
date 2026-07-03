@@ -26,7 +26,7 @@ function loadEntries(
     LEFT JOIN clients c ON p.client_id = c.id
     WHERE te.user_id = ? AND te.end_time IS NOT NULL AND c.id = ?
   `;
-  const params: unknown[] = [userId, clientId];
+  const params: (string | number)[] = [userId, clientId];
 
   const { start, end } = utcWindowForLocalRange(from, to);
   sql += ' AND te.start_time >= ? AND te.start_time <= ?';

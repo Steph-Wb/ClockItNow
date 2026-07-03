@@ -20,7 +20,7 @@ router.get('/', (req: Request, res: Response) => {
     LEFT JOIN clients c ON p.client_id = c.id
     WHERE te.user_id = ? AND te.end_time IS NOT NULL
   `;
-  const params: unknown[] = [userId];
+  const params: (string | number)[] = [userId];
 
   // SQL großzügig in UTC vorfiltern; die exakte lokale Tagesgrenze wird unten in JS gezogen.
   const fromKey = from !== undefined ? parseDateKey(from) : undefined;

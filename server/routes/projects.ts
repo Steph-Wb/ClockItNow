@@ -12,7 +12,7 @@ router.get('/', (req: Request, res: Response) => {
     LEFT JOIN clients c ON p.client_id = c.id
     WHERE p.user_id = ?
   `;
-  const params: unknown[] = [uid(req)];
+  const params: (string | number)[] = [uid(req)];
   if (clientId) { sql += ' AND p.client_id = ?'; params.push(Number(clientId)); }
   if (active !== undefined) { sql += ' AND p.is_active = ?'; params.push(Number(active)); }
   sql += ' ORDER BY p.name';
