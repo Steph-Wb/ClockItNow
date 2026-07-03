@@ -295,6 +295,7 @@
     "requestFailed": "Anfrage fehlgeschlagen",
     "loadFailed": "Fehler beim Laden",
     "internal": "Interner Serverfehler",
+    "invalidDateRange": "Ungültiger Datumsbereich (erwartetes Format: YYYY-MM-DD)",
     "notFound": "Nicht gefunden",
     "nameRequired": "Name ist erforderlich",
     "projectIdRequired": "projectId erforderlich",
@@ -315,6 +316,10 @@
       "linkAlreadyUsed": "Dieser Link wurde bereits verwendet",
       "linkExpired": "Link abgelaufen",
       "userNotFound": "Benutzer nicht gefunden"
+    },
+    "timeEntries": {
+      "invalidTimestamp": "Ungültiger Zeitstempel",
+      "endBeforeStart": "Endzeit darf nicht vor der Startzeit liegen"
     },
     "arbeitsrapport": {
       "paramsRequired": "Von, Bis und Kunde sind erforderlich",

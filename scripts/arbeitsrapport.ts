@@ -12,6 +12,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildArbeitsrapportWorkbook } from '../server/lib/buildArbeitsrapport.js';
+import { DEFAULT_TIMEZONE, isValidTimeZone, localDateKey, utcWindowForLocalRange } from '../server/lib/timezone.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.join(__dirname, '..', 'clockitnow.db');
@@ -32,10 +33,15 @@ if (!month || !/^\d{4}-\d{2}$/.test(month) || !clientName) {
 }
 
 const [year, mon] = month.split('-').map(Number);
-const from = new Date(year, mon - 1, 1).toISOString();
-const to = new Date(year, mon, 0, 23, 59, 59, 999).toISOString();
-const now = new Date();                                       // Erstellungsdatum
-const datum = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+if (mon < 1 || mon > 12) {
+  console.error(`Ungültiger Monat: ${month} (erwartet YYYY-MM mit Monat 01–12)`);
+  process.exit(1);
+}
+
+// Lokaler Kalenderbereich des Monats; die exakte Tagesgrenze wird unten
+// in der Zeitzone des Users gezogen (gleiche Logik wie server/routes/arbeitsrapport.ts)
+const fromKey = `${month}-01`;
+const toKey = new Date(Date.UTC(year, mon, 0)).toISOString().slice(0, 10); // letzter Tag des Monats
 
 const db = new DatabaseSync(DB_PATH);
 
@@ -46,10 +52,17 @@ if (!client) {
   process.exit(1);
 }
 
-const settings = db.prepare('SELECT sender_name, sender_address, signature_png FROM app_settings WHERE user_id = ?')
+const settings = db.prepare('SELECT sender_name, sender_address, signature_png, timezone FROM app_settings WHERE user_id = ?')
   .get(client.user_id) as any ?? {};
+const tz = settings.timezone && isValidTimeZone(settings.timezone) ? settings.timezone : DEFAULT_TIMEZONE;
 
-const entries = db.prepare(`
+// Erstellungsdatum in der Zeitzone des Users (wie der App-Endpoint)
+const [ty, tm, td] = localDateKey(new Date().toISOString(), tz).split('-');
+const datum = `${td}.${tm}.${ty}`;
+
+// SQL großzügig in UTC vorfiltern, dann exakte Monatsgrenze in der User-TZ ziehen
+const { start, end } = utcWindowForLocalRange(fromKey, toKey);
+const entries = (db.prepare(`
   SELECT te.description, te.start_time, te.end_time, p.name as project_name
   FROM time_entries te
   LEFT JOIN projects p ON te.project_id = p.id
@@ -58,7 +71,10 @@ const entries = db.prepare(`
     AND te.start_time >= ? AND te.start_time <= ?
     AND c.id = ?
   ORDER BY te.start_time ASC
-`).all(from, to, client.id) as any[];
+`).all(start, end, client.id) as any[]).filter(r => {
+  const k = localDateKey(r.start_time, tz);
+  return k >= fromKey && k <= toKey;
+});
 
 const postfix = client.rapport_postfix != null ? `.${String(client.rapport_postfix).padStart(2, '0')}` : '';
 const rapportNr = `${month}${postfix}`;

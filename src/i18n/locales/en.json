@@ -295,6 +295,7 @@
     "requestFailed": "Request failed",
     "loadFailed": "Failed to load",
     "internal": "Internal server error",
+    "invalidDateRange": "Invalid date range (expected format: YYYY-MM-DD)",
     "notFound": "Not found",
     "nameRequired": "Name is required",
     "projectIdRequired": "projectId is required",
@@ -315,6 +316,10 @@
       "linkAlreadyUsed": "This link has already been used",
       "linkExpired": "Link expired",
       "userNotFound": "User not found"
+    },
+    "timeEntries": {
+      "invalidTimestamp": "Invalid timestamp",
+      "endBeforeStart": "End time must not be before the start time"
     },
     "arbeitsrapport": {
       "paramsRequired": "From, to and client are required",

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../database.js';
 import { buildArbeitsrapportWorkbook } from '../lib/buildArbeitsrapport.js';
-import { getUserTimezone, localDateKey, utcWindowForLocalRange } from '../lib/timezone.js';
+import { getUserTimezone, localDateKey, utcWindowForLocalRange, parseDateKey } from '../lib/timezone.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 
 const router = Router();
@@ -53,14 +53,12 @@ function loadEntries(
   });
 }
 
-const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
-
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const { from, to, clientId, projektText, rapportNr, lang, projectIds, billable, billed } = req.query;
   if (!from || !to || !clientId) {
     return res.status(400).json({ error: 'errors.arbeitsrapport.paramsRequired' });
   }
-  if (!DATE_KEY.test(from as string) || !DATE_KEY.test(to as string)) {
+  if (!parseDateKey(from) || !parseDateKey(to)) {
     return res.status(400).json({ error: 'errors.arbeitsrapport.invalidDateRange' });
   }
   const userId = uid(req);
@@ -85,11 +83,10 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     tz,
   );
 
-  // Rapport-Nr. aus 'to' ableiten; Datum = Erstellungsdatum (heute)
-  const toDate = new Date(to as string);
-  const yyyymm = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}`;
-  const now = new Date();
-  const datum = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+  // Rapport-Nr. aus 'to' ableiten (Datumsstring direkt, ohne TZ-Drift); Datum = Erstellungsdatum (heute, in User-TZ)
+  const yyyymm = (to as string).slice(0, 7); // 'YYYY-MM'
+  const [ty, tm, td] = localDateKey(new Date().toISOString(), tz).split('-');
+  const datum = `${td}.${tm}.${ty}`;
 
   const postfix = client.rapport_postfix != null ? `.${String(client.rapport_postfix).padStart(2, '0')}` : '';
   const nr = (rapportNr as string) || `${yyyymm}${postfix}`;
