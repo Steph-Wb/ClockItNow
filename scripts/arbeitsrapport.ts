@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildArbeitsrapportWorkbook } from '../server/lib/buildArbeitsrapport.js';
 import { DEFAULT_TIMEZONE, isValidTimeZone, localDateKey, utcWindowForLocalRange } from '../server/lib/timezone.js';
+import { normalizeRoundingRule } from '../server/lib/rounding.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.join(__dirname, '..', 'clockitnow.db');
@@ -45,7 +46,7 @@ const toKey = new Date(Date.UTC(year, mon, 0)).toISOString().slice(0, 10); // le
 
 const db = new DatabaseSync(DB_PATH);
 
-const client = db.prepare('SELECT id, name, street, zip_city, rapport_postfix, rapport_description, user_id FROM clients WHERE name = ? COLLATE NOCASE')
+const client = db.prepare('SELECT id, name, street, zip_city, rapport_postfix, rapport_description, rounding_step, rounding_mode, user_id FROM clients WHERE name = ? COLLATE NOCASE')
   .get(clientName) as any;
 if (!client) {
   console.error(`Kunde "${clientName}" nicht gefunden.`);
@@ -87,6 +88,8 @@ const wb = buildArbeitsrapportWorkbook({
   projektText: projektArg || client.rapport_description || '',
   rapportNr,
   datum,
+  tz,
+  rounding: normalizeRoundingRule(client.rounding_step, client.rounding_mode),
 });
 
 const senderPart = settings.sender_name ? ` ${settings.sender_name}` : '';

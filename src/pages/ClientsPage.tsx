@@ -7,7 +7,7 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import type { Client } from '../types';
 
-interface EditingClient { id: number; name: string; street: string; zip_city: string; rapport_postfix: string; rapport_description: string; currency: string; }
+interface EditingClient { id: number; name: string; street: string; zip_city: string; rapport_postfix: string; rapport_description: string; currency: string; rounding_step: string; rounding_mode: 'up' | 'down'; }
 
 export default function ClientsPage() {
   const { t } = useTranslation();
@@ -34,6 +34,7 @@ export default function ClientsPage() {
       name: editing.name, street: editing.street, zip_city: editing.zip_city,
       rapport_postfix: editing.rapport_postfix === '' ? null : Number(editing.rapport_postfix),
       rapport_description: editing.rapport_description, currency: editing.currency,
+      rounding_step: Number(editing.rounding_step), rounding_mode: editing.rounding_mode,
     } as any);
     setEditing(null);
     reload();
@@ -77,13 +78,14 @@ export default function ClientsPage() {
                 <th className="text-left px-4 py-3">{t('clients.colZipCity')}</th>
                 <th className="text-left px-4 py-3">{t('clients.colPostfix')}</th>
                 <th className="text-left px-4 py-3">{t('clients.colDescription')}</th>
+                <th className="text-left px-4 py-3">{t('clients.colRounding')}</th>
                 <th className="text-left px-4 py-3">{t('clients.colCurrency')}</th>
                 <th className="px-4 py-3 w-20" />
               </tr>
             </thead>
             <tbody>
               {clients.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-8 text-secondary">{t('clients.noClients')}</td></tr>
+                <tr><td colSpan={8} className="text-center py-8 text-secondary">{t('clients.noClients')}</td></tr>
               )}
               {clients.map(client => (
                 <tr key={client.id} className="border-b border-border/50 hover:bg-white/3 transition-colors">
@@ -115,6 +117,19 @@ export default function ClientsPage() {
                           className="bg-background border border-border rounded px-2 py-1 text-sm text-primary outline-none w-full" />
                       </td>
                       <td className="px-4 py-2">
+                        <div className="flex gap-1">
+                          <select value={editing.rounding_step} onChange={e => setEditing({ ...editing, rounding_step: e.target.value })}
+                            className="bg-background border border-border rounded px-2 py-1 text-sm text-primary outline-none">
+                            {[5, 10, 15].map(s => <option key={s} value={s}>{s} min</option>)}
+                          </select>
+                          <select value={editing.rounding_mode} onChange={e => setEditing({ ...editing, rounding_mode: e.target.value as 'up' | 'down' })}
+                            className="bg-background border border-border rounded px-2 py-1 text-sm text-primary outline-none">
+                            <option value="up">{t('clients.roundingUp')}</option>
+                            <option value="down">{t('clients.roundingDown')}</option>
+                          </select>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
                         <select value={editing.currency} onChange={e => setEditing({ ...editing, currency: e.target.value })}
                           className="bg-background border border-border rounded px-2 py-1 text-sm text-primary outline-none">
                           {['CHF', 'EUR', 'USD', 'GBP'].map(c => <option key={c}>{c}</option>)}
@@ -134,10 +149,13 @@ export default function ClientsPage() {
                       <td className="px-4 py-3 text-secondary">{client.zip_city || '–'}</td>
                       <td className="px-4 py-3 text-secondary tabular-nums">{client.rapport_postfix != null ? String(client.rapport_postfix).padStart(2, '0') : '–'}</td>
                       <td className="px-4 py-3 text-secondary max-w-xs truncate" title={client.rapport_description || ''}>{client.rapport_description || '–'}</td>
+                      <td className="px-4 py-3 text-secondary whitespace-nowrap">
+                        {client.rounding_step ?? 15} min · {(client.rounding_mode ?? 'up') === 'up' ? t('clients.roundingUp') : t('clients.roundingDown')}
+                      </td>
                       <td className="px-4 py-3 text-secondary">{client.currency}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => setEditing({ id: client.id, name: client.name, street: client.street ?? '', zip_city: client.zip_city ?? '', rapport_postfix: client.rapport_postfix != null ? String(client.rapport_postfix) : '', rapport_description: client.rapport_description ?? '', currency: client.currency })}
+                          <button onClick={() => setEditing({ id: client.id, name: client.name, street: client.street ?? '', zip_city: client.zip_city ?? '', rapport_postfix: client.rapport_postfix != null ? String(client.rapport_postfix) : '', rapport_description: client.rapport_description ?? '', currency: client.currency, rounding_step: String(client.rounding_step ?? 15), rounding_mode: client.rounding_mode ?? 'up' })}
                             className="p-1 text-secondary hover:text-accent rounded"><Pencil size={14} /></button>
                           <button onClick={async () => { await (client.is_active ? archiveClient(client.id) : updateClient(client.id, { is_active: 1 })); reload(); }}
                             className="p-1 text-secondary hover:text-amber-400 rounded" title={client.is_active ? t('common.archive') : t('common.restore')}>

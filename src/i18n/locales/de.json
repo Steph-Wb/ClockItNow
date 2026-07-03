@@ -122,6 +122,9 @@
     "colZipCity": "PLZ / Ort",
     "colPostfix": "Postfix",
     "colDescription": "Rapport-Beschreibung",
+    "colRounding": "Rundung",
+    "roundingUp": "Aufrunden",
+    "roundingDown": "Abrunden",
     "colCurrency": "Währung",
     "noClients": "Keine Kunden",
     "streetPlaceholder": "Strasse und Nr.",
@@ -321,6 +324,9 @@
       "invalidTimestamp": "Ungültiger Zeitstempel",
       "endBeforeStart": "Endzeit darf nicht vor der Startzeit liegen",
       "importInvalid": "Ungültige Import-Daten"
+    },
+    "clients": {
+      "invalidRounding": "Ungültige Rundungsregel (Raster 5/10/15, Richtung auf/ab)"
     },
     "arbeitsrapport": {
       "paramsRequired": "Von, Bis und Kunde sind erforderlich",

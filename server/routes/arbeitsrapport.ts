@@ -3,6 +3,7 @@ import { db } from '../database.js';
 import { buildArbeitsrapportWorkbook } from '../lib/buildArbeitsrapport.js';
 import { getUserTimezone, localDateKey, utcWindowForLocalRange, parseDateKey } from '../lib/timezone.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { normalizeRoundingRule } from '../lib/rounding.js';
 
 const router = Router();
 const uid = (req: Request) => (req as any).user.id as number;
@@ -64,7 +65,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const userId = uid(req);
   const tz = getUserTimezone(userId);
 
-  const client = db.prepare('SELECT name, street, zip_city, rapport_postfix, rapport_description FROM clients WHERE id = ? AND user_id = ?')
+  const client = db.prepare('SELECT name, street, zip_city, rapport_postfix, rapport_description, rounding_step, rounding_mode FROM clients WHERE id = ? AND user_id = ?')
     .get(Number(clientId), userId) as any;
   if (!client) return res.status(404).json({ error: 'errors.arbeitsrapport.clientNotFound' });
 
@@ -100,6 +101,8 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     rapportNr: nr,
     datum,
     lang: (lang === 'en' ? 'en' : 'de'),
+    tz,
+    rounding: normalizeRoundingRule(client.rounding_step, client.rounding_mode),
   });
 
   const buffer = await wb.xlsx.writeBuffer();

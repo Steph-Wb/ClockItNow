@@ -122,6 +122,9 @@
     "colZipCity": "ZIP / City",
     "colPostfix": "Postfix",
     "colDescription": "Report description",
+    "colRounding": "Rounding",
+    "roundingUp": "Round up",
+    "roundingDown": "Round down",
     "colCurrency": "Currency",
     "noClients": "No clients",
     "streetPlaceholder": "Street and No.",
@@ -321,6 +324,9 @@
       "invalidTimestamp": "Invalid timestamp",
       "endBeforeStart": "End time must not be before the start time",
       "importInvalid": "Invalid import data"
+    },
+    "clients": {
+      "invalidRounding": "Invalid rounding rule (step 5/10/15, direction up/down)"
     },
     "arbeitsrapport": {
       "paramsRequired": "From, to and client are required",
