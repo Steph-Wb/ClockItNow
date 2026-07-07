@@ -1,10 +1,18 @@
-# ClockItNow
+# ClockItNow — Self-Hosted Time Tracking & Timesheet App
 
-A self-hosted, local-first time tracking app — a privacy-friendly alternative to Clockify and similar SaaS tools. All data stays on your machine.
+**A local-first, open-source alternative to Clockify: track time, manage clients and projects, and export monthly work reports (timesheets) as Excel — all data stays on your machine.**
 
-![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
+[![CI](https://github.com/Steph-Wb/ClockItNow/actions/workflows/ci.yml/badge.svg)](https://github.com/Steph-Wb/ClockItNow/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D24-green)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)
+![React](https://img.shields.io/badge/React-18-61dafb)
+
+ClockItNow is a self-hosted time tracker built for freelancers and small teams who bill by the hour but don't want their data in someone else's cloud. It runs as a single Node.js app with a built-in SQLite database — no Docker, no external services, no telemetry.
+
+<!-- TODO: Screenshot — ein Bild des Dashboards (KPIs + Balkendiagramm) hier einfügen, z.B.:
+![ClockItNow dashboard showing weekly KPIs, a daily hours bar chart and a per-project breakdown](docs/screenshot-dashboard.png)
+-->
 
 ## Features
 
@@ -101,6 +109,10 @@ Set up sender name, address and signature image once under **Settings** — they
 
 All data is stored in a local SQLite file (`clockitnow.db`) that is **never committed to git**.  
 No analytics, no telemetry, no external services required.
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up a development environment, run the checks and submit a pull request. By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

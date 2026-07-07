@@ -1,6 +1,29 @@
 {
   "name": "clockitnow",
   "version": "1.0.0",
+  "description": "Self-hosted, local-first time tracking app — an open-source Clockify alternative with client/project management and monthly Excel work report (timesheet) export",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Steph-Wb/ClockItNow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Steph-Wb/ClockItNow/issues"
+  },
+  "homepage": "https://github.com/Steph-Wb/ClockItNow#readme",
+  "keywords": [
+    "time-tracking",
+    "timesheet",
+    "self-hosted",
+    "clockify-alternative",
+    "work-report",
+    "invoicing",
+    "freelancer",
+    "sqlite",
+    "react",
+    "express"
+  ],
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
