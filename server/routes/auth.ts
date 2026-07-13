@@ -43,7 +43,7 @@ router.get('/status', (req: Request, res: Response) => {
     try { jwt.verify(token, JWT_SECRET()); loggedIn = true; } catch { /* expired */ }
   }
 
-  res.json({ loggedIn, hasUser });
+  res.json({ loggedIn, hasUser, magicLinkAvailable: !!process.env.SMTP_HOST });
 });
 
 // ── POST /api/auth/register ──────────────────────────────────────────────────
@@ -92,6 +92,9 @@ router.post('/logout', (_req: Request, res: Response) => {
 
 // ── POST /api/auth/magic-link ────────────────────────────────────────────────
 router.post('/magic-link', asyncHandler(async (req: Request, res: Response) => {
+  // Ohne SMTP-Konfiguration (optional, .env) gibt es keinen Mail-Versand
+  if (!process.env.SMTP_HOST) { res.status(501).json({ error: 'errors.auth.smtpNotConfigured' }); return; }
+
   const { email } = req.body;
   if (!email) { res.status(400).json({ error: 'errors.auth.emailRequired' }); return; }
 

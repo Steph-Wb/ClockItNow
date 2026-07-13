@@ -1,9 +1,35 @@
 import { DatabaseSync } from 'node:sqlite';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { dataDir } from './lib/appPaths.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '..', 'clockitnow.db');
+export const DB_PATH = path.join(dataDir, 'clockitnow.db');
+
+// Einmalige Migration: alte DB aus dem Projektordner an den neuen Ort kopieren.
+// VACUUM INTO erzeugt eine konsistente Kopie inkl. WAL-Inhalt; die alte Datei
+// bleibt unangetastet als zusätzliche Sicherung liegen.
+function migrateLegacyDb(): void {
+  if (fs.existsSync(DB_PATH)) return;
+  const candidates = [
+    path.join(process.cwd(), 'clockitnow.db'),
+    path.join(__dirname, '..', 'clockitnow.db'),       // dev: server/ → Projektroot
+    path.join(__dirname, '..', '..', 'clockitnow.db'), // kompiliert: dist/server/ → Projektroot
+  ];
+  const legacy = candidates.find(p => path.resolve(p) !== DB_PATH && fs.existsSync(p));
+  if (!legacy) return;
+
+  const old = new DatabaseSync(legacy);
+  try {
+    old.exec(`VACUUM INTO '${DB_PATH.replace(/'/g, "''")}'`);
+  } finally {
+    old.close();
+  }
+  console.log(`Datenbank migriert: ${legacy} -> ${DB_PATH}`);
+}
+
+migrateLegacyDb();
 
 export const db = new DatabaseSync(DB_PATH);
 

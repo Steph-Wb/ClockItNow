@@ -1,13 +1,17 @@
 @echo off
 cd /d "%~dp0"
 
-:: Bestehende Instanzen auf Port 3001 und 5173 beenden
-for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr /R ":3001 .*ABHOEREN\|:5173 .*ABHOEREN"') do (
+:: Bestehende Instanz auf Port 3001 beenden (deutsche + englische netstat-Ausgabe)
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr /R ":3001 .*ABHOEREN :3001 .*LISTENING"') do (
     if not "%%P"=="0" taskkill /PID %%P /F >nul 2>&1
 )
 
-:: Kurz warten bis Ports freigegeben sind
+:: Kurz warten bis der Port freigegeben ist
 timeout /t 2 /nobreak >nul
 
-:: App starten (npm run dev läuft im Hintergrund – Fenster wird von ClockItNow.vbs versteckt)
-npm run dev
+:: Produktionsbuild erzeugen, falls noch keiner existiert
+if not exist "dist\server\index.js" call npm run build
+if not exist "dist\client\index.html" call npm run build
+
+:: Produktionsserver starten (liefert Frontend + API auf Port 3001)
+call npm start
