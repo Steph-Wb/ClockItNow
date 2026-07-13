@@ -131,7 +131,13 @@ function buildMenu(): Menu {
       label: 'Beim Anmelden starten',
       type: 'checkbox',
       checked: app.getLoginItemSettings().openAtLogin,
-      click: mi => app.setLoginItemSettings({ openAtLogin: mi.checked }),
+      // Im Dev-Betrieb ist execPath electron.exe – ohne App-Pfad als Argument
+      // würde beim Login nur eine leere Electron-Instanz starten
+      click: mi => app.setLoginItemSettings({
+        openAtLogin: mi.checked,
+        path: process.execPath,
+        args: app.isPackaged ? [] : [`"${app.getAppPath()}"`],
+      }),
     },
     { type: 'separator' },
     { label: 'Beenden', click: () => { quitting = true; app.quit(); } },
