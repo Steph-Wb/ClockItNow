@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { format, parseISO, differenceInDays, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import { useTranslation } from 'react-i18next';
-import { getDashboard } from '../api';
+import { getDashboard, getSettings, updateSettings } from '../api';
 import { useApi } from '../hooks/useApi';
 import KpiCards from '../components/Dashboard/KpiCards';
 import DashboardBarChart from '../components/Dashboard/BarChart';
@@ -34,14 +34,33 @@ export default function DashboardPage() {
   const setFrom = (v: string) => { setFromState(v); localStorage.setItem(LS_FROM, v); };
   const setTo   = (v: string) => { setToState(v);   localStorage.setItem(LS_TO,   v); };
 
-  const [goal, setGoal] = useState<Goal | null>(() => {
-    const a = localStorage.getItem(LS_GOAL_A);
-    const p = localStorage.getItem(LS_GOAL_P);
-    return a && p ? { amount: Number(a), period: p as GoalPeriod } : null;
-  });
+  // Ziel liegt serverseitig in app_settings, damit Browser und Electron-App
+  // denselben Wert sehen (früher: localStorage, der ist pro App getrennt)
+  const settingsApi = useApi(getSettings, []);
+  const goal: Goal | null =
+    settingsApi.data?.goal_amount && settingsApi.data.goal_period
+      ? { amount: settingsApi.data.goal_amount, period: settingsApi.data.goal_period }
+      : null;
+
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState('');
   const [goalPeriodInput, setGoalPeriodInput] = useState<GoalPeriod>('month');
+
+  // Einmalige Übernahme eines alten localStorage-Ziels auf den Server
+  useEffect(() => {
+    if (!settingsApi.data) return;
+    const a = localStorage.getItem(LS_GOAL_A);
+    const p = localStorage.getItem(LS_GOAL_P);
+    if (!a || !p) return;
+    localStorage.removeItem(LS_GOAL_A);
+    localStorage.removeItem(LS_GOAL_P);
+    if (settingsApi.data.goal_amount == null && Number(a) > 0) {
+      updateSettings({ goal_amount: Number(a), goal_period: p as GoalPeriod })
+        .then(() => settingsApi.reload())
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsApi.data]);
 
   const openGoalModal = () => {
     setGoalInput(goal ? String(goal.amount) : '');
@@ -49,20 +68,18 @@ export default function DashboardPage() {
     setEditingGoal(true);
   };
 
-  const saveGoal = () => {
+  const saveGoal = async () => {
     const amount = parseFloat(goalInput.replace(',', '.'));
     if (!isNaN(amount) && amount > 0) {
-      localStorage.setItem(LS_GOAL_A, String(amount));
-      localStorage.setItem(LS_GOAL_P, goalPeriodInput);
-      setGoal({ amount, period: goalPeriodInput });
+      await updateSettings({ goal_amount: amount, goal_period: goalPeriodInput }).catch(() => {});
+      settingsApi.reload();
     }
     setEditingGoal(false);
   };
 
-  const clearGoal = () => {
-    localStorage.removeItem(LS_GOAL_A);
-    localStorage.removeItem(LS_GOAL_P);
-    setGoal(null);
+  const clearGoal = async () => {
+    await updateSettings({ goal_amount: null, goal_period: null }).catch(() => {});
+    settingsApi.reload();
     setEditingGoal(false);
   };
 

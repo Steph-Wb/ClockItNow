@@ -173,4 +173,12 @@ export function initDatabase(): void {
 
   if (!hasColumn('clients', 'rounding_mode'))
     db.exec(`ALTER TABLE clients ADD COLUMN rounding_mode TEXT DEFAULT 'up'`);
+
+  // Umsatzziel (Dashboard) – serverseitig statt localStorage, damit alle
+  // Oberflächen (Browser, Electron) denselben Wert sehen
+  if (!hasColumn('app_settings', 'goal_amount'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN goal_amount REAL`);
+
+  if (!hasColumn('app_settings', 'goal_period'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN goal_period TEXT`);
 }

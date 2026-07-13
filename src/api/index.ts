@@ -107,7 +107,7 @@ export const getReports = (params: {
 
 // Settings
 export const getSettings = () => req<AppSettings>('/api/settings');
-export const updateSettings = (data: AppSettings) =>
+export const updateSettings = (data: Partial<AppSettings>) =>
   req<AppSettings>('/api/settings', { method: 'PUT', body: JSON.stringify(data) });
 
 // Arbeitsrapport (binärer Download)

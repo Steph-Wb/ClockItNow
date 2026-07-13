@@ -81,4 +81,6 @@ export interface AppSettings {
   sender_address: string | null;
   signature_png: string | null;
   timezone?: string | null;
+  goal_amount?: number | null;
+  goal_period?: 'day' | 'week' | 'month' | null;
 }
