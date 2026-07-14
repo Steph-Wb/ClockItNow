@@ -258,7 +258,22 @@
     "signatureAlt": "Signature",
     "signatureRemove": "Remove",
     "signatureReplace": "Replace image",
-    "signatureUpload": "Upload image"
+    "signatureUpload": "Upload image",
+    "desktopTitle": "Desktop & reminders",
+    "desktopHelp": "Controls the desktop app's tray notifications: reminder when no timer is running during work hours, long-running timer alert, and the idle prompt. Changes take effect within a minute.",
+    "workDays": "Work days",
+    "dayShort": { "1": "Mon", "2": "Tue", "3": "Wed", "4": "Thu", "5": "Fri", "6": "Sat", "7": "Sun" },
+    "workFrom": "Work hours from",
+    "workTo": "to",
+    "longTimer": "Alert when timer runs longer than (hours)",
+    "idleMinutes": "Prompt after inactivity (minutes)",
+    "backupDir": "Backup folder",
+    "backupDirPlaceholder": "Empty = automatic (OneDrive, else data directory)",
+    "backupDirHelp": "Full path, e.g. D:\\Backups\\ClockItNow. Applies from the next backup run (on start and every 6 hours).",
+    "backupOpen": "Open folder",
+    "backupOpenTitle": "Opens the currently used backup folder in Explorer",
+    "backupCurrent": "Currently used:",
+    "backupKeep": "Backups to keep (count)"
   },
 
   "import": {

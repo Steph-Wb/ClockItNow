@@ -258,7 +258,22 @@
     "signatureAlt": "Unterschrift",
     "signatureRemove": "Entfernen",
     "signatureReplace": "Bild ersetzen",
-    "signatureUpload": "Bild hochladen"
+    "signatureUpload": "Bild hochladen",
+    "desktopTitle": "Desktop & Erinnerungen",
+    "desktopHelp": "Steuert die Hinweise der Desktop-App (Tray): Erinnerung bei fehlendem Timer während der Arbeitszeiten, Hinweis bei lange laufenden Timern und die Nachfrage nach Inaktivität. Änderungen greifen innerhalb einer Minute.",
+    "workDays": "Arbeitstage",
+    "dayShort": { "1": "Mo", "2": "Di", "3": "Mi", "4": "Do", "5": "Fr", "6": "Sa", "7": "So" },
+    "workFrom": "Arbeitszeit von",
+    "workTo": "bis",
+    "longTimer": "Hinweis bei Timer länger als (Stunden)",
+    "idleMinutes": "Nachfrage nach Inaktivität (Minuten)",
+    "backupDir": "Backup-Ordner",
+    "backupDirPlaceholder": "Leer = automatisch (OneDrive, sonst Datenverzeichnis)",
+    "backupDirHelp": "Vollständiger Pfad, z. B. D:\\Backups\\ClockItNow. Greift ab dem nächsten Backup-Lauf (beim Start und alle 6 Stunden).",
+    "backupOpen": "Ordner öffnen",
+    "backupOpenTitle": "Öffnet den aktuell verwendeten Backup-Ordner im Explorer",
+    "backupCurrent": "Aktuell verwendet:",
+    "backupKeep": "Backups aufbewahren (Anzahl)"
   },
 
   "import": {

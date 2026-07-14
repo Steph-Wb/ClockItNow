@@ -81,4 +81,15 @@ export interface AppSettings {
   sender_address: string | null;
   signature_png: string | null;
   timezone?: string | null;
+  goal_amount?: number | null;
+  goal_period?: 'day' | 'week' | 'month' | null;
+  ui_lang?: 'de' | 'en' | null;
+  work_days?: string | null;        // CSV, Mo=1 … So=7
+  work_start?: number | null;       // Stunde 0–23
+  work_end?: number | null;         // Stunde 1–24
+  long_timer_hours?: number | null;
+  idle_minutes?: number | null;
+  backup_dir?: string | null;       // null = automatisch (OneDrive/Fallback)
+  backup_keep?: number | null;
+  effective_backup_dir?: string;    // nur lesend: tatsächlich verwendeter Ordner
 }

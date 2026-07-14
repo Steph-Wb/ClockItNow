@@ -8,8 +8,9 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "outDir": "dist/server"
+    "outDir": "dist",
+    "rootDir": "."
   },
-  "include": ["server"],
+  "include": ["server", "electron"],
   "exclude": ["node_modules", "src"]
 }

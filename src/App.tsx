@@ -10,6 +10,14 @@ import LoginPage from './pages/LoginPage';
 import MagicLinkVerifyPage from './pages/MagicLinkVerifyPage';
 import AppErrorBoundary from './components/ui/AppErrorBoundary';
 import AuthGuard from './components/ui/AuthGuard';
+import { useLanguageSync } from './hooks/useLanguageSync';
+
+// Läuft nur eingeloggt (innerhalb AuthGuard): gleicht die UI-Sprache mit den
+// Server-Settings ab, damit Browser und Electron-Fenster dieselbe Sprache zeigen
+function SettingsSync() {
+  useLanguageSync();
+  return null;
+}
 
 export default function App() {
   return (
@@ -24,6 +32,7 @@ export default function App() {
           <Route path="/*" element={
             <AuthGuard>
               <AppErrorBoundary>
+                <SettingsSync />
                 <div className="flex min-h-screen bg-background text-primary">
                   <Sidebar />
                   <main className="flex-1 p-6 overflow-auto">
