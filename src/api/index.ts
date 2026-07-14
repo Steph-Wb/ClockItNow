@@ -15,7 +15,7 @@ async function req<T>(url: string, options?: RequestInit): Promise<T> {
 
 // Auth
 export const getAuthStatus = () =>
-  req<{ loggedIn: boolean; hasUser: boolean }>('/api/auth/status');
+  req<{ loggedIn: boolean; hasUser: boolean; magicLinkAvailable: boolean }>('/api/auth/status');
 export const register = (email: string, password: string) =>
   req<{ ok: boolean; email: string }>('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) });
 export const login = (email: string, password: string) =>

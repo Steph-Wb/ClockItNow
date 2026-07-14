@@ -1,8 +1,13 @@
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { initDatabase } from './database.js';
+import { ensureJwtSecret } from './lib/secret.js';
+import { startBackupSchedule } from './lib/backup.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import authRouter from './routes/auth.js';
 import clientsRouter from './routes/clients.js';
@@ -14,25 +19,37 @@ import tasksRouter from './routes/tasks.js';
 import settingsRouter from './routes/settings.js';
 import arbeitsrapportRouter from './routes/arbeitsrapport.js';
 
-// Fail fast: ohne JWT_SECRET würde jeder Login/Register zur Laufzeit werfen
-if (!process.env.JWT_SECRET) {
-  console.error('FEHLER: JWT_SECRET ist nicht gesetzt (.env). Server wird beendet.');
-  process.exit(1);
-}
+// JWT-Secret: aus .env, sonst aus dataDir/secret.key (wird bei Bedarf erzeugt)
+ensureJwtSecret();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-const PORT = 3001;
+// Bewusst kein generisches PORT: das setzen manche Umgebungen (z. B. Preview-Tools) selbst
+const PORT = Number(process.env.CLOCKITNOW_PORT ?? 3001);
 
-// CORS: Cookies erlauben + nur eigene App-URL zulassen
-app.use(cors({
-  origin: process.env.APP_URL ?? 'http://localhost:5173',
-  credentials: true,
-}));
+// Produktionsmodus: gebautes Frontend vorhanden? Dann liefert Express es selbst aus.
+const clientDir = [
+  path.join(__dirname, '..', 'client'),         // kompiliert: dist/server → dist/client
+  path.join(__dirname, '..', 'dist', 'client'), // dev (tsx): server/ → dist/client
+].find(d => fs.existsSync(path.join(d, 'index.html')));
+
+if (clientDir) {
+  // Same-Origin-Betrieb: kein CORS nötig; APP_URL (z. B. Magic-Link) zeigt auf uns selbst
+  if (!process.env.APP_URL) process.env.APP_URL = `http://localhost:${PORT}`;
+} else {
+  // Dev ohne Build: Vite-Dev-Server ist eine andere Origin
+  app.use(cors({
+    origin: process.env.APP_URL ?? 'http://localhost:5173',
+    credentials: true,
+  }));
+}
 
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 initDatabase();
+startBackupSchedule();
 
 // ── Öffentliche Routen (kein Auth nötig) ────────────────────────────────────
 app.use('/api/auth', authRouter);
@@ -47,6 +64,15 @@ app.use('/api/tasks',        requireAuth, tasksRouter);
 app.use('/api/settings',     requireAuth, settingsRouter);
 app.use('/api/arbeitsrapport', requireAuth, arbeitsrapportRouter);
 
+// ── Statisches Frontend + SPA-Fallback (nur wenn Build vorhanden) ───────────
+if (clientDir) {
+  app.use(express.static(clientDir));
+  // Alle Nicht-API-GETs auf index.html → Client-Routing (z. B. /dashboard direkt)
+  app.get(/^\/(?!api(\/|$)).*/, (_req: Request, res: Response) => {
+    res.sendFile(path.join(clientDir, 'index.html'));
+  });
+}
+
 // ── Zentraler Error-Handler (muss nach allen Routen registriert sein) ───────
 // Fängt sync-Throws und – via asyncHandler – auch Fehler aus async-Routen ab,
 // damit keine unhandled rejection den Prozess beendet.
@@ -56,5 +82,5 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`ClockItNow API server running on http://localhost:${PORT}`);
+  console.log(`ClockItNow ${clientDir ? 'läuft auf' : 'API-Server (nur API, kein Build) auf'} http://localhost:${PORT}`);
 });

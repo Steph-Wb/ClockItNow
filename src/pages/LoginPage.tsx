@@ -11,6 +11,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('password');
   const [hasUser, setHasUser] = useState(false);
+  const [magicAvailable, setMagicAvailable] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
 
   const [email, setEmail] = useState('');
@@ -23,6 +24,7 @@ export default function LoginPage() {
   useEffect(() => {
     getAuthStatus().then(d => {
       setHasUser(d.hasUser);
+      setMagicAvailable(d.magicLinkAvailable);
       if (!d.hasUser) setIsRegister(true);
       if (d.loggedIn) navigate('/', { replace: true });
     }).catch(() => {});
@@ -77,8 +79,8 @@ export default function LoginPage() {
             {isRegister && !hasUser ? t('auth.createAccountSubtitle') : t('auth.welcomeBack')}
           </p>
 
-          {/* Tabs – only when user already exists */}
-          {hasUser && (
+          {/* Tabs – only when user exists and SMTP (magic link) is configured */}
+          {hasUser && magicAvailable && (
             <div className="flex rounded-lg overflow-hidden border border-border mb-5">
               {([['password', t('auth.tabPassword')], ['magic', t('auth.tabMagicLink')]] as [Tab, string][]).map(([tabKey, label]) => (
                 <button key={tabKey} onClick={() => { setTab(tabKey); setError(''); setInfo(''); }}
@@ -90,7 +92,7 @@ export default function LoginPage() {
           )}
 
           {/* Password tab / registration */}
-          {(!hasUser || tab === 'password') && (
+          {(!hasUser || !magicAvailable || tab === 'password') && (
             <form onSubmit={handlePasswordSubmit} className="space-y-3">
               <div>
                 <label className="text-xs text-secondary block mb-1">{t('auth.email')}</label>
@@ -124,7 +126,7 @@ export default function LoginPage() {
           )}
 
           {/* Magic link tab */}
-          {hasUser && tab === 'magic' && (
+          {hasUser && magicAvailable && tab === 'magic' && (
             <form onSubmit={handleMagicLink} className="space-y-3">
               <div>
                 <label className="text-xs text-secondary block mb-1">{t('auth.email')}</label>

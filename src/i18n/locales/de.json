@@ -314,6 +314,7 @@
       "invalidCredentials": "Ungültige Zugangsdaten",
       "accountNotFound": "Kein Konto mit dieser E-Mail-Adresse gefunden",
       "emailSendFailed": "E-Mail konnte nicht gesendet werden. Prüfe die SMTP-Konfiguration in .env",
+      "smtpNotConfigured": "E-Mail-Login ist nicht eingerichtet (SMTP-Konfiguration fehlt)",
       "tokenMissing": "Token fehlt",
       "invalidLink": "Ungültiger Link",
       "linkAlreadyUsed": "Dieser Link wurde bereits verwendet",
