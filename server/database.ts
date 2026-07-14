@@ -181,4 +181,30 @@ export function initDatabase(): void {
 
   if (!hasColumn('app_settings', 'goal_period'))
     db.exec(`ALTER TABLE app_settings ADD COLUMN goal_period TEXT`);
+
+  // UI-Sprache – serverseitig, damit Browser und Electron-App gleich sprechen
+  if (!hasColumn('app_settings', 'ui_lang'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN ui_lang TEXT`);
+
+  // Desktop & Erinnerungen: Arbeitszeiten, Schwellwerte, Backup-Konfiguration
+  if (!hasColumn('app_settings', 'work_days'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN work_days TEXT DEFAULT '1,2,3,4,5'`);
+
+  if (!hasColumn('app_settings', 'work_start'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN work_start INTEGER DEFAULT 9`);
+
+  if (!hasColumn('app_settings', 'work_end'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN work_end INTEGER DEFAULT 17`);
+
+  if (!hasColumn('app_settings', 'long_timer_hours'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN long_timer_hours REAL DEFAULT 4`);
+
+  if (!hasColumn('app_settings', 'idle_minutes'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN idle_minutes INTEGER DEFAULT 10`);
+
+  if (!hasColumn('app_settings', 'backup_dir'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN backup_dir TEXT`);
+
+  if (!hasColumn('app_settings', 'backup_keep'))
+    db.exec(`ALTER TABLE app_settings ADD COLUMN backup_keep INTEGER DEFAULT 14`);
 }

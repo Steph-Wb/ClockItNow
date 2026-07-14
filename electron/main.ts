@@ -11,9 +11,30 @@ const PORT = Number(process.env.CLOCKITNOW_PORT ?? 3001);
 const BASE = `http://localhost:${PORT}`;
 
 const POLL_MS = 15_000;                       // Timer-Status-Abfrage
-const IDLE_THRESHOLD_S = 10 * 60;             // ab 10 Min Inaktivität nachfragen
-const LONG_TIMER_MS = 4 * 60 * 60 * 1000;     // Hinweis bei Timern > 4 h
 const REMINDER_GAP_MS = 60 * 60 * 1000;       // „nichts getrackt" max. 1×/h
+
+// Verhaltensparameter kommen aus den Server-Settings (Einstellungen-Seite);
+// bis zum ersten erfolgreichen Abruf gelten diese Defaults
+type BehaviorConfig = { workDays: number[]; workStart: number; workEnd: number; longTimerMs: number; idleThresholdS: number };
+let behavior: BehaviorConfig = {
+  workDays: [1, 2, 3, 4, 5],
+  workStart: 9,
+  workEnd: 17,
+  longTimerMs: 4 * 60 * 60 * 1000,
+  idleThresholdS: 10 * 60,
+};
+
+function applyServerSettings(s: Record<string, unknown> | null): void {
+  if (!s) return;
+  const days = String(s.work_days ?? '').split(',').map(Number).filter(n => n >= 1 && n <= 7);
+  behavior = {
+    workDays: days.length > 0 ? days : behavior.workDays,
+    workStart: typeof s.work_start === 'number' ? s.work_start : behavior.workStart,
+    workEnd: typeof s.work_end === 'number' ? s.work_end : behavior.workEnd,
+    longTimerMs: typeof s.long_timer_hours === 'number' ? s.long_timer_hours * 3_600_000 : behavior.longTimerMs,
+    idleThresholdS: typeof s.idle_minutes === 'number' ? s.idle_minutes * 60 : behavior.idleThresholdS,
+  };
+}
 
 // ── Einstellungen (Tray-Toggles), persistiert im Datenverzeichnis ────────────
 const settingsFile = path.join(dataDir, 'electron-settings.json');
@@ -176,18 +197,22 @@ function notify(title: string, body: string): void {
 
 function isWorkHours(): boolean {
   const now = new Date();
-  const day = now.getDay(); // 0 = So
-  return day >= 1 && day <= 5 && now.getHours() >= 9 && now.getHours() < 17;
+  const isoDay = now.getDay() === 0 ? 7 : now.getDay(); // Mo=1 … So=7
+  return behavior.workDays.includes(isoDay)
+    && now.getHours() >= behavior.workStart
+    && now.getHours() < behavior.workEnd;
 }
 
 async function poll(): Promise<void> {
+  applyServerSettings(await api<Record<string, unknown>>('/api/settings'));
+
   const entry = await api<NonNullable<ActiveEntry>>('/api/time-entries/active');
   active = entry && entry.id ? entry : null;
   updateTray();
 
   if (active) {
     const dur = Date.now() - Date.parse(active.start_time);
-    if (dur > LONG_TIMER_MS && longNotifiedId !== active.id) {
+    if (dur > behavior.longTimerMs && longNotifiedId !== active.id) {
       longNotifiedId = active.id;
       notify(`Timer läuft seit ${fmtDuration(dur)}`, `„${entryLabel(active)}" – läuft der noch korrekt?`);
     }
@@ -216,7 +241,7 @@ async function askIdle(idleStartMs: number): Promise<void> {
 
 function idleCheck(): void {
   const idleS = powerMonitor.getSystemIdleTime();
-  if (active && idleS >= IDLE_THRESHOLD_S && idleStartedAt === null) {
+  if (active && idleS >= behavior.idleThresholdS && idleStartedAt === null) {
     idleStartedAt = Date.now() - idleS * 1000;
   } else if (idleStartedAt !== null && idleS < 60) {
     const started = idleStartedAt;
