@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dataDir } from '../server/lib/appPaths.js';
-import { trayIcon } from './trayIcon.js';
+import { appIcon, trayIcon } from './trayIcon.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -190,7 +190,7 @@ async function stopTimer(endIso: string): Promise<void> {
 
 function notify(title: string, body: string): void {
   if (!Notification.isSupported()) return;
-  const n = new Notification({ title, body });
+  const n = new Notification({ title, body, icon: appIcon(64) });
   n.on('click', showWindow);
   n.show();
 }
@@ -252,7 +252,8 @@ function idleCheck(): void {
 
 // ── Fenster + App-Lifecycle ──────────────────────────────────────────────────
 function createWindow(): void {
-  win = new BrowserWindow({ width: 1240, height: 840, autoHideMenuBar: true, title: 'ClockItNow' });
+  // icon: App-Logo (Taskleiste + Fenstertitel); zur Laufzeit aus logo.svg nachgezeichnet
+  win = new BrowserWindow({ width: 1240, height: 840, autoHideMenuBar: true, title: 'ClockItNow', icon: appIcon() });
   void win.loadURL(BASE);
   // Schließen minimiert in den Tray, beendet die App nicht
   win.on('close', e => {

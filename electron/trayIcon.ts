@@ -2,11 +2,10 @@ import zlib from 'zlib';
 import { nativeImage, NativeImage } from 'electron';
 
 /**
- * Erzeugt die Tray-Icons (32x32, Uhr-Symbol) zur Laufzeit als PNG –
- * bewusst ohne Binär-Assets im Repo. Teal = Timer läuft, Grau = kein Timer.
+ * Erzeugt Tray- und App-Icons zur Laufzeit als PNG – bewusst ohne
+ * Binär-Assets im Repo. Das App-Icon zeichnet public/logo.svg nach
+ * (Koordinatensystem 40x40, skaliert per SDF-Rendering mit Antialiasing).
  */
-
-const SIZE = 32;
 
 function crc32(buf: Buffer): number {
   let c: number;
@@ -30,16 +29,16 @@ function chunk(type: string, data: Buffer): Buffer {
   return Buffer.concat([len, body, crc]);
 }
 
-function encodePng(rgba: Buffer): Buffer {
+function encodePng(rgba: Buffer, size: number): Buffer {
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(SIZE, 0);
-  ihdr.writeUInt32BE(SIZE, 4);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
   ihdr[8] = 8;  // bit depth
   ihdr[9] = 6;  // color type RGBA
   // Scanlines: Filterbyte 0 + Rohdaten pro Zeile
-  const raw = Buffer.alloc(SIZE * (1 + SIZE * 4));
-  for (let y = 0; y < SIZE; y++) {
-    rgba.copy(raw, y * (1 + SIZE * 4) + 1, y * SIZE * 4, (y + 1) * SIZE * 4);
+  const raw = Buffer.alloc(size * (1 + size * 4));
+  for (let y = 0; y < size; y++) {
+    rgba.copy(raw, y * (1 + size * 4) + 1, y * size * 4, (y + 1) * size * 4);
   }
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -49,35 +48,81 @@ function encodePng(rgba: Buffer): Buffer {
   ]);
 }
 
-function drawClock(color: [number, number, number]): Buffer {
-  const px = Buffer.alloc(SIZE * SIZE * 4);
-  const cx = SIZE / 2 - 0.5, cy = SIZE / 2 - 0.5, r = SIZE / 2 - 2;
+type RGB = [number, number, number];
+const TEAL: RGB = [0, 188, 212];   // #00BCD4
+const GREY: RGB = [128, 134, 139];
+const BG: RGB = [31, 41, 55];      // #1f2937
+const WHITE: RGB = [249, 250, 251]; // #F9FAFB
 
-  const set = (x: number, y: number, rgb: [number, number, number], a: number) => {
-    const i = (y * SIZE + x) * 4;
-    px[i] = rgb[0]; px[i + 1] = rgb[1]; px[i + 2] = rgb[2];
-    px[i + 3] = Math.max(px[i + 3], Math.round(a * 255));
-  };
+const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 
-  // Zifferblatt (weich gerandete Scheibe)
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      const d = Math.hypot(x - cx, y - cy);
-      const a = Math.min(Math.max(r + 0.5 - d, 0), 1);
-      if (a > 0) set(x, y, color, a);
+/** Signierte Distanz zu abgerundetem Rechteck (Zentrum, Halbmaße, Eckradius) */
+function sdRoundRect(x: number, y: number, cx: number, cy: number, hw: number, hh: number, r: number): number {
+  const qx = Math.abs(x - cx) - (hw - r);
+  const qy = Math.abs(y - cy) - (hh - r);
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+}
+
+/** Distanz zu Liniensegment (für Zeiger mit runden Enden) */
+function sdSegment(x: number, y: number, ax: number, ay: number, bx: number, by: number): number {
+  const pax = x - ax, pay = y - ay, bax = bx - ax, bay = by - ay;
+  const h = clamp01((pax * bax + pay * bay) / (bax * bax + bay * bay || 1));
+  return Math.hypot(pax - bax * h, pay - bay * h);
+}
+
+/** Ebenen (Coverage + Farbe) alpha-korrekt zu einem RGBA-Buffer kompositieren */
+function render(size: number, layersAt: (x: number, y: number) => [number, RGB][]): Buffer {
+  const px = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let r = 0, g = 0, b = 0, a = 0;
+      for (const [cov, col] of layersAt(x + 0.5, y + 0.5)) {
+        if (cov <= 0) continue;
+        r = col[0] * cov + r * (1 - cov);
+        g = col[1] * cov + g * (1 - cov);
+        b = col[2] * cov + b * (1 - cov);
+        a = cov + a * (1 - cov);
+      }
+      const i = (y * size + x) * 4;
+      // Premultiplied → straight alpha (PNG erwartet nicht-vormultipliziert)
+      px[i] = Math.round(a > 0 ? r / a : 0);
+      px[i + 1] = Math.round(a > 0 ? g / a : 0);
+      px[i + 2] = Math.round(a > 0 ? b / a : 0);
+      px[i + 3] = Math.round(a * 255);
     }
   }
-
-  // Zeiger in Weiß: Minutenzeiger nach oben, Stundenzeiger nach rechts
-  const white: [number, number, number] = [255, 255, 255];
-  const cxi = Math.round(cx), cyi = Math.round(cy);
-  for (let y = cyi - Math.round(r * 0.62); y <= cyi; y++) { set(cxi, y, white, 1); set(cxi + 1, y, white, 1); }
-  for (let x = cxi; x <= cxi + Math.round(r * 0.45); x++) { set(x, cyi, white, 1); set(x, cyi + 1, white, 1); }
-
   return px;
 }
 
+/** App-Logo (wie public/logo.svg): dunkles Quadrat, türkise Uhr mit Aufzieher */
+export function appIcon(size = 256): NativeImage {
+  const s = size / 40;
+  const rgba = render(size, (X, Y) => {
+    const dC = Math.hypot(X - 20 * s, Y - 22 * s);
+    return [
+      [clamp01(0.5 - sdRoundRect(X, Y, 20 * s, 20 * s, 20 * s, 20 * s, 10 * s)), BG],
+      [clamp01(0.5 - (Math.abs(dC - 13 * s) - 1.25 * s)), TEAL],                          // Uhr-Kreis
+      [clamp01(0.5 - (sdSegment(X, Y, 20 * s, 22 * s, 20 * s, 13 * s) - 1.25 * s)), TEAL], // Stundenzeiger
+      [clamp01(0.5 - (sdSegment(X, Y, 20 * s, 22 * s, 27 * s, 22 * s) - 1.25 * s)), WHITE], // Minutenzeiger
+      [clamp01(0.5 - (dC - 2 * s)), TEAL],                                                 // Mittelpunkt
+      [clamp01(0.5 - sdRoundRect(X, Y, 20 * s, 6.5 * s, 4 * s, 1.5 * s, 1.5 * s)), TEAL],  // Aufzieher
+    ];
+  });
+  return nativeImage.createFromBuffer(encodePng(rgba, size), { scaleFactor: 1 });
+}
+
+/** Tray-Icon: schlichte Uhr-Scheibe, Türkis = Timer läuft, Grau = kein Timer */
 export function trayIcon(running: boolean): NativeImage {
-  const color: [number, number, number] = running ? [0, 188, 212] : [128, 134, 139];
-  return nativeImage.createFromBuffer(encodePng(drawClock(color)), { scaleFactor: 1 });
+  const size = 32;
+  const color = running ? TEAL : GREY;
+  const c = size / 2 - 0.5, r = size / 2 - 2;
+  const rgba = render(size, (X, Y) => {
+    const dC = Math.hypot(X - c, Y - c);
+    return [
+      [clamp01(0.5 - (dC - r)), color],
+      [clamp01(0.5 - (sdSegment(X, Y, c, c, c, c - r * 0.62) - 1)), WHITE], // Minutenzeiger
+      [clamp01(0.5 - (sdSegment(X, Y, c, c, c + r * 0.45, c) - 1)), WHITE], // Stundenzeiger
+    ];
+  });
+  return nativeImage.createFromBuffer(encodePng(rgba, size), { scaleFactor: 1 });
 }
