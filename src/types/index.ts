@@ -91,4 +91,5 @@ export interface AppSettings {
   idle_minutes?: number | null;
   backup_dir?: string | null;       // null = automatisch (OneDrive/Fallback)
   backup_keep?: number | null;
+  effective_backup_dir?: string;    // nur lesend: tatsächlich verwendeter Ordner
 }

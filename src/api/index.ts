@@ -109,6 +109,8 @@ export const getReports = (params: {
 export const getSettings = () => req<AppSettings>('/api/settings');
 export const updateSettings = (data: Partial<AppSettings>) =>
   req<AppSettings>('/api/settings', { method: 'PUT', body: JSON.stringify(data) });
+export const openBackupDir = () =>
+  req<{ ok: boolean; dir: string }>('/api/settings/open-backup-dir', { method: 'POST' });
 
 // Arbeitsrapport (binärer Download)
 export const downloadArbeitsrapport = async (params: {

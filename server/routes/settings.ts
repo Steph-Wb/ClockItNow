@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
+import { spawn } from 'child_process';
+import fs from 'fs';
 import { db } from '../database.js';
 import { DEFAULT_TIMEZONE, isValidTimeZone } from '../lib/timezone.js';
+import { resolveBackupDir } from '../lib/backup.js';
 
 const router = Router();
 const uid = (req: Request) => (req as any).user.id as number;
@@ -34,7 +37,18 @@ function normalizeWorkDays(v: unknown, fallback: string): string {
 
 router.get('/', (req: Request, res: Response) => {
   const row = db.prepare(`SELECT ${SELECT_COLS} FROM app_settings WHERE user_id = ?`).get(uid(req));
-  res.json(row ?? DEFAULTS);
+  // effective_backup_dir: der tatsächlich verwendete Ordner (Default oder hinterlegt)
+  res.json({ ...(row ?? DEFAULTS), effective_backup_dir: resolveBackupDir() });
+});
+
+// Öffnet den effektiven Backup-Ordner im Datei-Explorer (Server = lokaler Rechner)
+router.post('/open-backup-dir', (_req: Request, res: Response) => {
+  const dir = resolveBackupDir();
+  fs.mkdirSync(dir, { recursive: true });
+  const opener = process.platform === 'win32' ? 'explorer.exe'
+    : process.platform === 'darwin' ? 'open' : 'xdg-open';
+  spawn(opener, [dir], { detached: true, stdio: 'ignore' }).unref();
+  res.json({ ok: true, dir });
 });
 
 router.put('/', (req: Request, res: Response) => {
@@ -97,7 +111,7 @@ router.put('/', (req: Request, res: Response) => {
   );
 
   const row = db.prepare(`SELECT ${SELECT_COLS} FROM app_settings WHERE user_id = ?`).get(uid(req));
-  res.json(row);
+  res.json({ ...(row as Record<string, unknown>), effective_backup_dir: resolveBackupDir() });
 });
 
 export default router;

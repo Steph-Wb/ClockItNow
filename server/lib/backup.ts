@@ -26,7 +26,7 @@ function dbBackupConfig(): { dir: string | null; keep: number } {
  * der DB → %OneDrive%\ClockItNow-Backups → dataDir\backups.
  * OneDrive bevorzugt, damit die Sicherung den Rechner verlässt.
  */
-function resolveBackupDir(): string {
+export function resolveBackupDir(): string {
   const override = process.env.CLOCKITNOW_BACKUP_DIR;
   if (override && override.trim()) return path.resolve(override.trim());
   const fromDb = dbBackupConfig().dir;

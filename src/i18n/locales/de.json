@@ -270,6 +270,9 @@
     "backupDir": "Backup-Ordner",
     "backupDirPlaceholder": "Leer = automatisch (OneDrive, sonst Datenverzeichnis)",
     "backupDirHelp": "Vollständiger Pfad, z. B. D:\\Backups\\ClockItNow. Greift ab dem nächsten Backup-Lauf (beim Start und alle 6 Stunden).",
+    "backupOpen": "Ordner öffnen",
+    "backupOpenTitle": "Öffnet den aktuell verwendeten Backup-Ordner im Explorer",
+    "backupCurrent": "Aktuell verwendet:",
     "backupKeep": "Backups aufbewahren (Anzahl)"
   },
 

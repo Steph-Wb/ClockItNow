@@ -270,6 +270,9 @@
     "backupDir": "Backup folder",
     "backupDirPlaceholder": "Empty = automatic (OneDrive, else data directory)",
     "backupDirHelp": "Full path, e.g. D:\\Backups\\ClockItNow. Applies from the next backup run (on start and every 6 hours).",
+    "backupOpen": "Open folder",
+    "backupOpenTitle": "Opens the currently used backup folder in Explorer",
+    "backupCurrent": "Currently used:",
     "backupKeep": "Backups to keep (count)"
   },
 

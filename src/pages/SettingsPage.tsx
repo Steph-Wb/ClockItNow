@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Save, Upload, Trash2 } from 'lucide-react';
+import { Save, Upload, Trash2, FolderOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { getSettings, updateSettings } from '../api';
+import { getSettings, updateSettings, openBackupDir } from '../api';
 import { useApi } from '../hooks/useApi';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorBanner from '../components/ui/ErrorBanner';
@@ -187,10 +187,22 @@ export default function SettingsPage() {
         <div className="border-t border-border/50 pt-4 space-y-4">
           <div>
             <label className="text-xs text-secondary mb-1.5 block">{t('settings.backupDir')}</label>
-            <input value={backupDir} onChange={e => setBackupDir(e.target.value)}
-              placeholder={t('settings.backupDirPlaceholder')}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent" />
+            <div className="flex gap-2">
+              <input value={backupDir} onChange={e => setBackupDir(e.target.value)}
+                placeholder={t('settings.backupDirPlaceholder')}
+                className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent" />
+              <button onClick={() => openBackupDir().catch(() => {})} type="button"
+                title={t('settings.backupOpenTitle')}
+                className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm text-secondary hover:text-primary hover:border-accent whitespace-nowrap">
+                <FolderOpen size={15} /> {t('settings.backupOpen')}
+              </button>
+            </div>
             <p className="text-xs text-secondary mt-1">{t('settings.backupDirHelp')}</p>
+            {data?.effective_backup_dir && (
+              <p className="text-xs text-secondary mt-1">
+                {t('settings.backupCurrent')} <span className="font-mono">{data.effective_backup_dir}</span>
+              </p>
+            )}
           </div>
           <div className="w-40">
             <label className="text-xs text-secondary mb-1.5 block">{t('settings.backupKeep')}</label>
