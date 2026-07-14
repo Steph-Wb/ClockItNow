@@ -25,12 +25,14 @@
   ],
   "private": true,
   "type": "module",
+  "main": "dist/electron/main.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "tsx watch server/index.ts",
     "client": "vite",
     "build": "tsc -p tsconfig.node.json && vite build",
     "start": "node dist/server/index.js",
+    "electron": "npm run build && electron .",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -64,6 +66,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.4.19",
     "concurrently": "^10.0.3",
+    "electron": "^43.1.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "tsx": "^4.15.6",
