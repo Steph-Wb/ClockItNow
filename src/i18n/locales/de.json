@@ -94,6 +94,7 @@
     "totalTime": "Gesamtzeit",
     "billableAmount": "Abrechnungsbetrag",
     "billedAmount": "Bereits abgerechnet",
+    "unbilledAmount": "Noch abzurechnen:",
     "editGoal": "Zielumsatz bearbeiten",
     "setGoal": "Zielumsatz festlegen",
     "goalTarget": "Ziel: CHF {{amount}}",

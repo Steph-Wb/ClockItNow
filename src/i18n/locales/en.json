@@ -94,6 +94,7 @@
     "totalTime": "Total time",
     "billableAmount": "Billable amount",
     "billedAmount": "Already billed",
+    "unbilledAmount": "Still to bill:",
     "editGoal": "Edit revenue goal",
     "setGoal": "Set revenue goal",
     "goalTarget": "Target: CHF {{amount}}",
