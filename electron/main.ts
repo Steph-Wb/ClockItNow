@@ -254,7 +254,9 @@ function idleCheck(): void {
 function createWindow(): void {
   // icon: App-Logo (Taskleiste + Fenstertitel); zur Laufzeit aus logo.svg nachgezeichnet
   win = new BrowserWindow({ width: 1240, height: 840, autoHideMenuBar: true, title: 'ClockItNow', icon: appIcon() });
-  void win.loadURL(BASE);
+  // Auto-Login über den lokalen Token: In der Desktop-App ist kein Passwort
+  // nötig (gleiche Berechtigungsstufe wie Dateizugriff auf die DB)
+  void win.loadURL(localToken ? `${BASE}/api/auth/local-login?token=${localToken}` : BASE);
   // Schließen minimiert in den Tray, beendet die App nicht
   win.on('close', e => {
     if (!quitting) { e.preventDefault(); win?.hide(); }

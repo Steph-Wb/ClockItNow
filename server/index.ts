@@ -34,6 +34,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 // Bewusst kein generisches PORT: das setzen manche Umgebungen (z. B. Preview-Tools) selbst
 const PORT = Number(process.env.CLOCKITNOW_PORT ?? 3001);
+// Local-first: nur auf localhost lauschen – nicht aus dem LAN erreichbar
+const HOST = process.env.CLOCKITNOW_HOST ?? '127.0.0.1';
 
 // Produktionsmodus: gebautes Frontend vorhanden? Dann liefert Express es selbst aus.
 const clientDir = [
@@ -88,6 +90,6 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (!res.headersSent) res.status(500).json({ error: 'errors.internal' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   console.log(`ClockItNow ${clientDir ? 'läuft auf' : 'API-Server (nur API, kein Build) auf'} http://localhost:${PORT}`);
 });
