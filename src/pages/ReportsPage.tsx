@@ -12,6 +12,7 @@ import ErrorBanner from '../components/ui/ErrorBanner';
 import { formatDuration } from '../utils/formatDuration';
 import { formatCurrency } from '../utils/formatCurrency';
 import { formatDate, formatTime } from '../utils/dateLocale';
+import { downloadBlob } from '../utils/downloadBlob';
 import type { Client, Project, ReportEntry } from '../types';
 
 export default function ReportsPage() {
@@ -73,9 +74,7 @@ export default function ReportsPage() {
     ];
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `Rapport_${from}_${to}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `Rapport_${from}_${to}.csv`);
   };
 
   const printReport = () => {
