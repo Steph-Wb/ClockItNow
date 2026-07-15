@@ -26,3 +26,7 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Packaging-Artefakte (electron-builder)
+release/
+build/

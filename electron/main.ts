@@ -268,6 +268,10 @@ function showWindow(): void {
 
 app.setAppUserModelId('com.clockitnow.app'); // nötig für Windows-Benachrichtigungen
 
+// Chromium-Profil (Cache, Local Storage …) getrennt von den Nutzdaten halten –
+// sonst landet es als productName-Default direkt neben der DB in %APPDATA%\ClockItNow
+app.setPath('userData', path.join(dataDir, 'electron-profile'));
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {

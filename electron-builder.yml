@@ -1,0 +1,27 @@
+# Packaging-Konfiguration für den Windows-Installer (Phase 3)
+# Aufruf: npm run dist (Installer) bzw. npm run pack (nur win-unpacked zum Testen)
+appId: com.clockitnow.app
+productName: ClockItNow
+directories:
+  buildResources: build   # build/icon.ico wird von scripts/make-icon.mjs erzeugt
+  output: release
+
+# App-Code: nur die Build-Artefakte; produktive node_modules (express etc.)
+# sammelt electron-builder automatisch über den Dependency-Baum ein
+files:
+  - dist/**/*
+  - package.json
+  - "!dist/**/*.map"
+
+win:
+  target:
+    - nsis
+  icon: build/icon.ico
+
+nsis:
+  # Ein-Klick-Installation pro Benutzer, ohne Admin-Rechte – für nicht-technische Nutzer
+  oneClick: true
+  perMachine: false
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false   # Zeitdaten überleben eine Deinstallation
+  artifactName: ClockItNow-Setup-${version}.${ext}

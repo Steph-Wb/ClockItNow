@@ -1,10 +1,12 @@
 import 'dotenv/config';
+import dotenv from 'dotenv';
 import express, { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { dataDir } from './lib/appPaths.js';
 import { initDatabase } from './database.js';
 import { ensureJwtSecret } from './lib/secret.js';
 import { startBackupSchedule } from './lib/backup.js';
@@ -18,6 +20,11 @@ import reportsRouter from './routes/reports.js';
 import tasksRouter from './routes/tasks.js';
 import settingsRouter from './routes/settings.js';
 import arbeitsrapportRouter from './routes/arbeitsrapport.js';
+
+// Zweite .env-Quelle: Datenverzeichnis. Die installierte App hat keinen
+// Projektordner – SMTP & Co. lassen sich in %APPDATA%\ClockItNow\.env pflegen.
+// (Bereits gesetzte Variablen werden von dotenv nicht überschrieben.)
+dotenv.config({ path: path.join(dataDir, '.env') });
 
 // JWT-Secret: aus .env, sonst aus dataDir/secret.key (wird bei Bedarf erzeugt)
 ensureJwtSecret();
