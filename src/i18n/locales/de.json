@@ -84,6 +84,8 @@
     "thisWeek": "Diese Woche",
     "weekLabel": "KW {{week}} · {{from}} – {{to}}",
     "noDescription": "Keine Beschreibung",
+    "noProject": "Kein Projekt",
+    "editProject": "Kunde, Projekt und Aufgabe bearbeiten",
     "deleteConfirm": "Zeiteintrag löschen?",
     "editDuration": "Dauer bearbeiten",
     "moveDate": "Datum verschieben",
