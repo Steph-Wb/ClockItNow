@@ -136,15 +136,19 @@ export default function KpiCards({
         </div>
       </div>
 
-      {/* Already billed amount */}
-      <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-4">
-        <div className="text-accent bg-white/5 rounded-lg p-2.5">
+      {/* Already billed amount + open remainder */}
+      <div className="bg-card border border-border rounded-xl p-5 flex items-start gap-4">
+        <div className="text-accent bg-white/5 rounded-lg p-2.5 flex-shrink-0 mt-0.5">
           <Receipt size={22} />
         </div>
         <div>
           <p className="text-xs text-secondary mb-0.5">{t('dashboard.billedAmount')}</p>
           <p className="text-xl font-semibold text-accent font-mono tabular-nums">
             {formatCurrency(billedAmount)}
+          </p>
+          <p className="text-xs text-secondary mt-0.5">
+            {t('dashboard.unbilledAmount')}{' '}
+            <span className="font-mono tabular-nums text-primary">{formatCurrency(billableAmount - billedAmount)}</span>
           </p>
         </div>
       </div>

@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { db } from '../database.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { localToken } from '../lib/localToken.js';
 
 const router = Router();
 
@@ -44,6 +45,23 @@ router.get('/status', (req: Request, res: Response) => {
   }
 
   res.json({ loggedIn, hasUser, magicLinkAvailable: !!process.env.SMTP_HOST });
+});
+
+// ── GET /api/auth/local-login ────────────────────────────────────────────────
+// Auto-Login für die Desktop-App: Der Electron-Hauptprozess kennt den lokalen
+// Token aus dem Datenverzeichnis (gleiche Berechtigungsstufe wie direkter
+// DB-Dateizugriff) und lädt das Fenster über diese URL – kein Passwort nötig.
+// Der Passwort-Login im Browser bleibt davon unberührt.
+router.get('/local-login', (req: Request, res: Response) => {
+  const { token } = req.query;
+  if (typeof token !== 'string' || !localToken || token !== localToken) {
+    res.status(403).json({ error: 'errors.auth.invalidLink' });
+    return;
+  }
+  const user = db.prepare('SELECT id, email FROM users LIMIT 1').get() as { id: number; email: string } | undefined;
+  if (!user) { res.redirect('/login'); return; } // noch kein Konto → Registrierung
+  setSessionCookie(res, user.id, user.email);
+  res.redirect('/');
 });
 
 // ── POST /api/auth/register ──────────────────────────────────────────────────

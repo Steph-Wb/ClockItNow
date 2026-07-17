@@ -3,6 +3,8 @@ import { parseISO, differenceInSeconds, addSeconds, format, isSameWeek, startOfW
 import { Pencil, Trash2, Play, DollarSign, Check, X, CalendarDays } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import EntryDatePicker from './EntryDatePicker';
+import ProjectDropdown from './ProjectDropdown';
+import TaskSelector from './TaskSelector';
 import { formatDuration } from '../../utils/formatDuration';
 import { formatDateHeader, formatTime, WEEK_OPTIONS } from '../../utils/dateLocale';
 import { updateTimeEntry, deleteTimeEntry } from '../../api';
@@ -17,7 +19,7 @@ interface Props {
 
 interface EditState {
   id: number;
-  field: 'description' | 'start_time' | 'end_time' | 'duration' | 'project';
+  field: 'description' | 'start_time' | 'end_time' | 'duration';
   value: string;
 }
 
@@ -66,6 +68,7 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
   const { t } = useTranslation();
   const [editState, setEditState] = useState<EditState | null>(null);
   const [datePickerId, setDatePickerId] = useState<number | null>(null);
+  const [projectEditId, setProjectEditId] = useState<number | null>(null);
   const dateButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   const moveToDate = async (entry: typeof entries[0], newDate: Date) => {
@@ -78,6 +81,18 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
       update.end_time = addSeconds(newStart, duration).toISOString();
     }
     await updateTimeEntry(entry.id, update as any);
+    onReload();
+  };
+
+  // Projektwechsel (bestimmt implizit auch den Kunden, da project → client) setzt
+  // die Aufgabe zurück – eine Aufgabe des alten Projekts passt sonst nicht mehr
+  const changeEntryProject = async (entry: TimeEntry, projectId: number | undefined) => {
+    await updateTimeEntry(entry.id, { project_id: projectId ?? null, task_id: null } as any);
+    onReload();
+  };
+
+  const changeEntryTask = async (entry: TimeEntry, taskId: number | undefined) => {
+    await updateTimeEntry(entry.id, { task_id: taskId ?? null } as any);
     onReload();
   };
 
@@ -106,9 +121,6 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
       if (secs !== null && secs > 0) {
         update.end_time = addSeconds(parseISO(entry.start_time), secs).toISOString();
       }
-    }
-    if (editState.field === 'project') {
-      update.project_id = editState.value ? Number(editState.value) : undefined;
     }
     await updateTimeEntry(entry.id, update);
     setEditState(null);
@@ -193,11 +205,33 @@ export default function TimeEntryList({ entries, projects, onReload, onRestart }
                               {entry.description || <span className="text-secondary italic">{t('timer.noDescription')}</span>}
                             </button>
                           )}
-                          {(entry.task_name || entry.project_name) && (
-                            <span className="text-xs text-secondary mt-0.5 block">
+                          {projectEditId === entry.id ? (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <ProjectDropdown
+                                value={entry.project_id}
+                                onChange={pid => changeEntryProject(entry, pid)}
+                              />
+                              {entry.project_id && (
+                                <TaskSelector
+                                  projectId={entry.project_id}
+                                  value={entry.task_id}
+                                  onChange={tid => changeEntryTask(entry, tid)}
+                                />
+                              )}
+                              <button onClick={() => setProjectEditId(null)} className="text-accent flex-shrink-0">
+                                <Check size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setProjectEditId(entry.id)}
+                              title={t('timer.editProject')}
+                              className="text-xs text-secondary mt-0.5 block text-left hover:text-accent transition-colors truncate w-full"
+                            >
                               {entry.task_name && <span className="text-accent/80">{entry.task_name} · </span>}
-                              {entry.project_name}{entry.client_name ? ` · ${entry.client_name}` : ''}
-                            </span>
+                              {entry.project_name || <span className="italic">{t('timer.noProject')}</span>}
+                              {entry.client_name ? ` · ${entry.client_name}` : ''}
+                            </button>
                           )}
                         </div>
 

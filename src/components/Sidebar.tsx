@@ -3,6 +3,10 @@ import { Clock, LayoutGrid, Users, BarChart2, Folder, Settings, LogOut } from 'l
 import { useTranslation } from 'react-i18next';
 import { logout } from '../api';
 
+// In der Desktop-App gibt es keinen Logout: Das Electron-Fenster meldet sich
+// beim Start automatisch über den lokalen Token wieder an
+const isDesktopApp = navigator.userAgent.includes('Electron');
+
 export default function Sidebar() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -49,16 +53,18 @@ export default function Sidebar() {
         ))}
       </ul>
 
-      {/* Logout */}
-      <div className="px-2 mt-2">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-secondary hover:text-primary hover:bg-white/5 transition-colors"
-        >
-          <LogOut size={18} />
-          {t('nav.logout')}
-        </button>
-      </div>
+      {/* Logout – nur im Browser sinnvoll */}
+      {!isDesktopApp && (
+        <div className="px-2 mt-2">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-secondary hover:text-primary hover:bg-white/5 transition-colors"
+          >
+            <LogOut size={18} />
+            {t('nav.logout')}
+          </button>
+        </div>
+      )}
     </nav>
   );
 }

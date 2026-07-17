@@ -1,10 +1,12 @@
 import 'dotenv/config';
+import dotenv from 'dotenv';
 import express, { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { dataDir } from './lib/appPaths.js';
 import { initDatabase } from './database.js';
 import { ensureJwtSecret } from './lib/secret.js';
 import { startBackupSchedule } from './lib/backup.js';
@@ -19,6 +21,11 @@ import tasksRouter from './routes/tasks.js';
 import settingsRouter from './routes/settings.js';
 import arbeitsrapportRouter from './routes/arbeitsrapport.js';
 
+// Zweite .env-Quelle: Datenverzeichnis. Die installierte App hat keinen
+// Projektordner – SMTP & Co. lassen sich in %APPDATA%\ClockItNow\.env pflegen.
+// (Bereits gesetzte Variablen werden von dotenv nicht überschrieben.)
+dotenv.config({ path: path.join(dataDir, '.env') });
+
 // JWT-Secret: aus .env, sonst aus dataDir/secret.key (wird bei Bedarf erzeugt)
 ensureJwtSecret();
 
@@ -27,6 +34,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 // Bewusst kein generisches PORT: das setzen manche Umgebungen (z. B. Preview-Tools) selbst
 const PORT = Number(process.env.CLOCKITNOW_PORT ?? 3001);
+// Local-first: nur auf localhost lauschen – nicht aus dem LAN erreichbar
+const HOST = process.env.CLOCKITNOW_HOST ?? '127.0.0.1';
 
 // Produktionsmodus: gebautes Frontend vorhanden? Dann liefert Express es selbst aus.
 const clientDir = [
@@ -81,6 +90,6 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (!res.headersSent) res.status(500).json({ error: 'errors.internal' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   console.log(`ClockItNow ${clientDir ? 'läuft auf' : 'API-Server (nur API, kein Build) auf'} http://localhost:${PORT}`);
 });

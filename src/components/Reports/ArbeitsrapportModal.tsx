@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n/config';
 import { downloadArbeitsrapport, markArbeitsrapportBilled } from '../../api';
 import { translateError } from '../../i18n';
+import { downloadBlob } from '../../utils/downloadBlob';
 import type { Client } from '../../types';
 
 interface Props {
@@ -36,12 +37,7 @@ export default function ArbeitsrapportModal({ clients, from, to, billable, bille
     setError(null);
     try {
       const blob = await downloadArbeitsrapport({ from, to, clientId: client.id, projektText: projekt, rapportNr, lang: i18n.language, projectIds, billable, billed });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Arbeitsrapport-${rapportNr} ${client.name}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `Arbeitsrapport-${rapportNr} ${client.name}.xlsx`);
       // Erst nachdem die Datei vollständig angekommen ist als rapportiert markieren –
       // schlägt der Download fehl, bleibt der Abrechnungsstatus unverändert.
       await markArbeitsrapportBilled({ from, to, clientId: client.id, projectIds, billable, billed });
