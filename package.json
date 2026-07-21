@@ -1,6 +1,6 @@
 {
   "name": "clockitnow",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "author": "Stephan Weibel",
   "description": "Self-hosted, local-first time tracking app — an open-source Clockify alternative with client/project management and monthly Excel work report (timesheet) export",
   "license": "AGPL-3.0-only",
