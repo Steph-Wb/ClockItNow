@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, X, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getTasks, createTask } from '../../api';
 import type { Task } from '../../types';
+
+const PANEL_WIDTH = 224; // w-56
 
 interface Props {
   projectId: number;
@@ -17,7 +20,9 @@ export default function TaskSelector({ projectId, value, onChange }: Props) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const selectedTask = tasks.find(tk => tk.id === value);
 
@@ -27,8 +32,17 @@ export default function TaskSelector({ projectId, value, onChange }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    if (containerRef.current) {
+      const r = containerRef.current.getBoundingClientRect();
+      const left = Math.min(r.left, window.innerWidth - PANEL_WIDTH - 8);
+      setPos({ top: r.bottom + 6, left: Math.max(8, left) });
+    }
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        panelRef.current && !panelRef.current.contains(target)
+      ) {
         setOpen(false);
         setCreating(false);
       }
@@ -83,8 +97,12 @@ export default function TaskSelector({ projectId, value, onChange }: Props) {
         )}
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 bg-sidebar border border-border rounded-xl shadow-2xl w-56">
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[9999] bg-sidebar border border-border rounded-xl shadow-2xl w-56"
+          style={{ top: pos.top, left: pos.left }}
+        >
           <div className="max-h-48 overflow-y-auto py-1">
             {value && (
               <button
@@ -143,7 +161,8 @@ export default function TaskSelector({ projectId, value, onChange }: Props) {
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

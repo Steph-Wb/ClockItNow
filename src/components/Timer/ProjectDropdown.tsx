@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Plus, ChevronDown, X } from 'lucide-react';
 import { getProjects, createProject, getClients } from '../../api';
 import type { Project, Client } from '../../types';
+
+const PANEL_WIDTH = 288; // w-72
 
 interface Props {
   value: number | undefined;
@@ -19,7 +22,9 @@ export default function ProjectDropdown({ value, onChange, onProjectCreated }: P
   const [newClientId, setNewClientId] = useState<number | undefined>();
   const [newColor, setNewColor] = useState('#00BCD4');
   const [saving, setSaving] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const selectedProject = projects.find(p => p.id === value);
@@ -37,9 +42,18 @@ export default function ProjectDropdown({ value, onChange, onProjectCreated }: P
 
   useEffect(() => {
     if (!open) return;
+    if (containerRef.current) {
+      const r = containerRef.current.getBoundingClientRect();
+      const left = Math.min(r.left, window.innerWidth - PANEL_WIDTH - 8);
+      setPos({ top: r.bottom + 6, left: Math.max(8, left) });
+    }
     setTimeout(() => searchRef.current?.focus(), 50);
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        panelRef.current && !panelRef.current.contains(target)
+      ) {
         setOpen(false);
         setCreating(false);
         setSearch('');
@@ -132,8 +146,12 @@ export default function ProjectDropdown({ value, onChange, onProjectCreated }: P
       </div>
 
       {/* Dropdown */}
-      {open && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 bg-sidebar border border-border rounded-xl shadow-2xl w-72">
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[9999] bg-sidebar border border-border rounded-xl shadow-2xl w-72"
+          style={{ top: pos.top, left: pos.left }}
+        >
           {/* Search */}
           <div className="p-2 border-b border-border">
             <div className="flex items-center gap-2 bg-background rounded-lg px-3 py-1.5">
@@ -246,7 +264,8 @@ export default function ProjectDropdown({ value, onChange, onProjectCreated }: P
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
