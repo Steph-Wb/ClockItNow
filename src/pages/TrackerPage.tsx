@@ -39,7 +39,7 @@ export default function TrackerPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const { activeEntry, elapsed, isRunning, startTimer, stopTimer, updateStartTime } = useTimer(loadEntries);
+  const { activeEntry, elapsed, isRunning, startTimer, stopTimer, updateStartTime } = useTimer(loadEntries, loadEntries);
 
   const handleUpdateActive = useCallback(async (data: {
     description?: string; project_id?: number | null; task_id?: number | null; is_billable?: number;
