@@ -67,8 +67,26 @@ let active: ActiveEntry = null;
 let longNotifiedId: number | null = null;
 let lastReminderAt = Date.now(); // erste Erinnerung frühestens nach REMINDER_GAP_MS
 let idleStartedAt: number | null = null;
+let idleDialog: AbortController | null = null;       // höchstens ein Inaktivitäts-Dialog gleichzeitig
+let polling = false;                                  // verhindert überlappende Polls
+let trayKey = '';                                     // Menü nur bei Änderung neu aufbauen
+const toasts = new Map<ToastKind, Notification>();   // höchstens ein Toast je Art
+
+type ToastKind = 'reminder' | 'long';
+
+// Fehler im Main-Prozess dürfen weder Timer-Callbacks noch Fenster lahmlegen
+process.on('uncaughtException', err => console.error('[main] uncaughtException', err));
+process.on('unhandledRejection', err => console.error('[main] unhandledRejection', err));
 
 // ── Server-Anbindung ─────────────────────────────────────────────────────────
+
+// Dem Renderer mitteilen, dass sich der Timer außerhalb der Oberfläche geändert hat
+function notifyRenderer(): void {
+  if (!win || win.isDestroyed()) return;
+  win.webContents
+    .executeJavaScript("window.dispatchEvent(new Event('clockitnow:timer-changed'))")
+    .catch(() => { /* Seite lädt gerade */ });
+}
 async function isServerUp(): Promise<boolean> {
   try { return (await fetch(`${BASE}/api/auth/status`)).ok; } catch { return false; }
 }
@@ -96,6 +114,7 @@ async function startServer(): Promise<void> {
   });
   serverProc.stdout?.on('data', d => console.log('[server]', String(d).trimEnd()));
   serverProc.stderr?.on('data', d => console.error('[server]', String(d).trimEnd()));
+  serverProc.on('exit', code => console.error(`[server] beendet (Code ${code})`));
 
   if (!(await waitForServer())) {
     dialog.showErrorBox('ClockItNow', 'Der lokale Server konnte nicht gestartet werden.');
@@ -112,6 +131,7 @@ async function api<T>(pathname: string, init?: RequestInit): Promise<T | null> {
   if (!localToken) readLocalToken();
   try {
     const r = await fetch(`${BASE}${pathname}`, {
+      signal: AbortSignal.timeout(10_000),
       ...init,
       headers: { 'Content-Type': 'application/json', 'x-local-token': localToken, ...(init?.headers ?? {}) },
     });
@@ -167,31 +187,57 @@ function buildMenu(): Menu {
 
 function updateTray(): void {
   if (!tray) return;
-  tray.setImage(trayIcon(!!active));
   tray.setToolTip(active
     ? `ClockItNow – ${entryLabel(active)} läuft seit ${fmtDuration(Date.now() - Date.parse(active.start_time))}`
     : 'ClockItNow – kein Timer läuft');
+  // Icon + Menü sind aufwendig (PNG-Encoding, native Handles) – nur bei Änderung neu bauen
+  const key = `${active ? `${active.id}:${entryLabel(active)}` : ''}|${settings.reminders}`;
+  if (key === trayKey) return;
+  trayKey = key;
+  tray.setImage(trayIcon(!!active));
   tray.setContextMenu(buildMenu());
 }
 
 // ── Timer-Aktionen + Benachrichtigungen ──────────────────────────────────────
-async function stopTimer(endIso: string): Promise<void> {
-  if (!active) return;
+function closeIdleDialog(): void {
+  idleDialog?.abort();
+  idleDialog = null;
+}
+
+function closeToast(kind: ToastKind): void {
+  toasts.get(kind)?.close();
+  toasts.delete(kind);
+}
+
+// expectedId: verhindert, dass ein veralteter Dialog einen neueren Timer stoppt
+async function stopTimer(endIso: string, expectedId?: number): Promise<void> {
+  if (!active || (expectedId !== undefined && active.id !== expectedId)) return;
+  const entry = active;
   // Ende darf nicht vor dem Start liegen (z. B. Idle begann vor Timer-Start)
-  const minEnd = Date.parse(active.start_time) + 60_000;
+  const minEnd = Date.parse(entry.start_time) + 60_000;
   const end = Math.max(Date.parse(endIso), minEnd);
-  await api(`/api/time-entries/${active.id}`, {
+  const res = await api(`/api/time-entries/${entry.id}`, {
     method: 'PUT',
     body: JSON.stringify({ end_time: new Date(end).toISOString() }),
   });
-  active = null;
+  if (res === null) {
+    // Stopp fehlgeschlagen (oder Eintrag existiert nicht mehr) – echten Stand holen
+    await poll();
+    return;
+  }
+  if (active?.id === entry.id) active = null;
+  closeIdleDialog();
   updateTray();
+  notifyRenderer();
 }
 
-function notify(title: string, body: string): void {
+function notify(kind: ToastKind, title: string, body: string): void {
   if (!Notification.isSupported()) return;
+  closeToast(kind);
   const n = new Notification({ title, body, icon: appIcon(64) });
+  toasts.set(kind, n); // Referenz halten, sonst kann n vor 'click' garbage-collected werden
   n.on('click', showWindow);
+  n.on('close', () => { if (toasts.get(kind) === n) toasts.delete(kind); });
   n.show();
 }
 
@@ -204,43 +250,71 @@ function isWorkHours(): boolean {
 }
 
 async function poll(): Promise<void> {
-  applyServerSettings(await api<Record<string, unknown>>('/api/settings'));
+  if (polling) return; // hängender Request darf keine weiteren Polls stapeln
+  polling = true;
+  try {
+    applyServerSettings(await api<Record<string, unknown>>('/api/settings'));
 
-  const entry = await api<NonNullable<ActiveEntry>>('/api/time-entries/active');
-  active = entry && entry.id ? entry : null;
-  updateTray();
+    const prevId = active?.id ?? null;
+    const entry = await api<NonNullable<ActiveEntry>>('/api/time-entries/active');
+    active = entry && entry.id ? entry : null;
+    updateTray();
+    // Timer wurde außerhalb des Fensters gestartet/gestoppt (Tray, Browser) → Oberfläche nachziehen
+    if ((active?.id ?? null) !== prevId) notifyRenderer();
 
-  if (active) {
-    const dur = Date.now() - Date.parse(active.start_time);
-    if (dur > behavior.longTimerMs && longNotifiedId !== active.id) {
-      longNotifiedId = active.id;
-      notify(`Timer läuft seit ${fmtDuration(dur)}`, `„${entryLabel(active)}" – läuft der noch korrekt?`);
+    if (active) {
+      closeToast('reminder');
+      const dur = Date.now() - Date.parse(active.start_time);
+      if (dur > behavior.longTimerMs && longNotifiedId !== active.id) {
+        longNotifiedId = active.id;
+        notify('long', `Timer läuft seit ${fmtDuration(dur)}`, `„${entryLabel(active)}" – läuft der noch korrekt?`);
+      }
+    } else {
+      closeToast('long');
+      closeIdleDialog(); // Dialog bezieht sich auf einen Timer, der nicht mehr läuft
+      if (settings.reminders && isWorkHours() && Date.now() - lastReminderAt > REMINDER_GAP_MS) {
+        lastReminderAt = Date.now();
+        notify('reminder', 'Kein Timer aktiv', 'Du trackst gerade nichts – Timer starten?');
+      }
     }
-  } else if (settings.reminders && isWorkHours() && Date.now() - lastReminderAt > REMINDER_GAP_MS) {
-    lastReminderAt = Date.now();
-    notify('Kein Timer aktiv', 'Du trackst gerade nichts – Timer starten?');
+  } finally {
+    polling = false;
   }
 }
 
 // ── Idle-Erkennung ───────────────────────────────────────────────────────────
+// Es ist immer höchstens ein Dialog offen: ein neuer ersetzt den alten.
 async function askIdle(idleStartMs: number): Promise<void> {
   if (!active) return;
   const mins = Math.round((Date.now() - idleStartMs) / 60_000);
   if (mins < 1) return;
-  const { response } = await dialog.showMessageBox({
-    type: 'question',
-    title: 'ClockItNow',
-    message: `Du warst ${mins} Minuten inaktiv – der Timer lief weiter.`,
-    detail: `Laufender Eintrag: „${entryLabel(active)}"`,
-    buttons: ['Weiterlaufen lassen', 'Timer rückwirkend bei Inaktivitätsbeginn stoppen'],
-    defaultId: 0,
-    cancelId: 0,
-  });
-  if (response === 1) await stopTimer(new Date(idleStartMs).toISOString());
+  const entryId = active.id;
+  closeIdleDialog();
+  const ctrl = new AbortController();
+  idleDialog = ctrl;
+  try {
+    const { response } = await dialog.showMessageBox({
+      type: 'question',
+      title: 'ClockItNow',
+      message: `Du warst ${mins} Minuten inaktiv – der Timer lief weiter.`,
+      detail: `Laufender Eintrag: „${entryLabel(active)}"`,
+      buttons: ['Weiterlaufen lassen', 'Timer rückwirkend bei Inaktivitätsbeginn stoppen'],
+      defaultId: 0,
+      cancelId: 0,
+      signal: ctrl.signal,
+    });
+    if (ctrl.signal.aborted) return; // ersetzt oder Timer inzwischen beendet
+    if (response === 1) await stopTimer(new Date(idleStartMs).toISOString(), entryId);
+  } catch (err) {
+    if (!ctrl.signal.aborted) console.error('[main] askIdle', err);
+  } finally {
+    if (idleDialog === ctrl) idleDialog = null;
+  }
 }
 
 function idleCheck(): void {
   const idleS = powerMonitor.getSystemIdleTime();
+  if (!active) idleStartedAt = null;
   if (active && idleS >= behavior.idleThresholdS && idleStartedAt === null) {
     idleStartedAt = Date.now() - idleS * 1000;
   } else if (idleStartedAt !== null && idleS < 60) {
@@ -253,19 +327,32 @@ function idleCheck(): void {
 // ── Fenster + App-Lifecycle ──────────────────────────────────────────────────
 function createWindow(): void {
   // icon: App-Logo (Taskleiste + Fenstertitel); zur Laufzeit aus logo.svg nachgezeichnet
-  win = new BrowserWindow({ width: 1240, height: 840, autoHideMenuBar: true, title: 'ClockItNow', icon: appIcon() });
+  const w = new BrowserWindow({ width: 1240, height: 840, autoHideMenuBar: true, title: 'ClockItNow', icon: appIcon() });
+  win = w;
   // Auto-Login über den lokalen Token: In der Desktop-App ist kein Passwort
   // nötig (gleiche Berechtigungsstufe wie Dateizugriff auf die DB)
-  void win.loadURL(localToken ? `${BASE}/api/auth/local-login?token=${localToken}` : BASE);
+  void w.loadURL(localToken ? `${BASE}/api/auth/local-login?token=${localToken}` : BASE);
   // Schließen minimiert in den Tray, beendet die App nicht
-  win.on('close', e => {
-    if (!quitting) { e.preventDefault(); win?.hide(); }
+  w.on('close', e => {
+    if (quitting) return;
+    e.preventDefault();
+    if (!w.isDestroyed()) w.hide();
   });
+  w.on('closed', () => { if (win === w) win = null; });
+  // Windows-Abmelden/Herunterfahren darf nicht am versteckten Fenster scheitern
+  w.on('session-end', () => { quitting = true; });
+  w.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[main] render-process-gone', details.reason);
+    if (!w.isDestroyed()) w.reload();
+  });
+  w.webContents.on('unresponsive', () => console.error('[main] Fenster reagiert nicht'));
 }
 
 function showWindow(): void {
-  if (!win || win.isDestroyed()) createWindow();
-  else { win.show(); win.focus(); }
+  if (!win || win.isDestroyed()) { createWindow(); return; }
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
 }
 
 app.setAppUserModelId('com.clockitnow.app'); // nötig für Windows-Benachrichtigungen
@@ -290,9 +377,12 @@ if (!app.requestSingleInstanceLock()) {
 
     createWindow();
 
-    void poll();
-    setInterval(() => void poll(), POLL_MS);
-    setInterval(idleCheck, 30_000);
+    const safePoll = () => poll().catch(err => console.error('[main] poll', err));
+    void safePoll();
+    setInterval(safePoll, POLL_MS);
+    setInterval(() => {
+      try { idleCheck(); } catch (err) { console.error('[main] idleCheck', err); }
+    }, 30_000);
 
     // Standby zählt wie Inaktivität
     let suspendAt: number | null = null;
