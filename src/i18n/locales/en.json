@@ -224,6 +224,8 @@
     "projektPlaceholder": "e.g. Various tasks according to the list \"abas support daily\"",
     "singleClientRequired": "Exactly one client must be selected in the Reports filters to create a work report.",
     "rapportNrLabel": "Report No.:",
+    "seqLabel": "Sequence no. {{year}}",
+    "seqHelp": "Counts up per client and restarts at 01 each year. Only change it to correct the count.",
     "periodLabel": "Period:",
     "createError": "Error creating report",
     "creating": "Creating...",

@@ -224,6 +224,8 @@
     "projektPlaceholder": "z.B. Diverse Aufträge gemäss der Liste \"abas support daily\"",
     "singleClientRequired": "Für den Arbeitsrapport muss in den Berichte-Filtern genau ein Kunde ausgewählt sein.",
     "rapportNrLabel": "Rapport-Nr.:",
+    "seqLabel": "Laufende Nr. {{year}}",
+    "seqHelp": "Zählt pro Kunde hoch und beginnt jedes Jahr wieder bei 01. Nur ändern, um die Zählung zu korrigieren.",
     "periodLabel": "Zeitraum:",
     "createError": "Fehler bei der Erstellung",
     "creating": "Erstellen...",

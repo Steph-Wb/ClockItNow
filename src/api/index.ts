@@ -132,9 +132,14 @@ export const downloadArbeitsrapport = async (params: {
   return res.blob();
 };
 
+// Nächste laufende Rapport-Nr. eines Kunden (pro Jahr von `to`); verändert nichts
+export const getNextRapportNumber = (params: { to: string; clientId: number }) =>
+  req<{ year: number; seq: number }>(`/api/arbeitsrapport/next-number?${new URLSearchParams({ to: params.to, clientId: String(params.clientId) })}`);
+
 // Bestätigung nach erfolgreichem Download: Einträge des Rapports als rapportiert markieren
+// und die laufende Rapport-Nr. (rapportSeq) des Kunden fortschreiben
 export const markArbeitsrapportBilled = (params: {
-  from: string; to: string; clientId: number;
+  from: string; to: string; clientId: number; rapportSeq?: number;
   projectIds?: number[]; billable?: 'all' | 'billable' | 'non_billable'; billed?: 'all' | 'billed' | 'unbilled';
 }) =>
   req<{ marked: number }>('/api/arbeitsrapport/mark-billed', { method: 'POST', body: JSON.stringify(params) });

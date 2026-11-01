@@ -6,7 +6,7 @@ description: Erstellt einen monatlichen Arbeitsrapport (.xlsx) für einen Kunden
 # Arbeitsrapport erstellen
 
 Erzeugt eine Excel-Datei (`.xlsx`) im Format des Monats-Arbeitsrapports: Absenderkopf,
-Kunden-Block, Rapport-Nr. (`YYYY-MM`), Projekt-Beschreibung, Tabelle der ausgeführten Arbeiten
+Kunden-Block, Rapport-Nr. (`YYYY-NN[.Postfix]`, NN = laufende Nummer pro Kunde, jedes Jahr neu ab 01), Projekt-Beschreibung, Tabelle der ausgeführten Arbeiten
 (pro Tag eine Zeile: Datum · Dauer · Tätigkeit · kumulierte Summe), Total und Unterschriftsblock
 mit eingebetteter Unterschrift-Grafik.
 

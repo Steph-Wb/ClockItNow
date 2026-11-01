@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { buildArbeitsrapportWorkbook } from '../server/lib/buildArbeitsrapport.js';
 import { DEFAULT_TIMEZONE, isValidTimeZone, localDateKey, utcWindowForLocalRange } from '../server/lib/timezone.js';
 import { normalizeRoundingRule } from '../server/lib/rounding.js';
+import { commitSeq, ensureRapportCounterTable, formatRapportNr, peekNextSeq } from '../server/lib/rapportNumber.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.join(__dirname, '..', 'clockitnow.db');
@@ -77,8 +78,10 @@ const entries = (db.prepare(`
   return k >= fromKey && k <= toKey;
 });
 
-const postfix = client.rapport_postfix != null ? `.${String(client.rapport_postfix).padStart(2, '0')}` : '';
-const rapportNr = `${month}${postfix}`;
+// Laufende Rapport-Nr. pro Kunde und Jahr (wie im App-Endpoint); Zähler wird erst nach dem Schreiben der Datei fortgeschrieben
+ensureRapportCounterTable(db);
+const seq = peekNextSeq(db, client.id, year);
+const rapportNr = formatRapportNr(year, seq, client.rapport_postfix);
 
 const wb = buildArbeitsrapportWorkbook({
   entries,
@@ -100,4 +103,5 @@ if (outArg && fs.existsSync(outArg) && fs.statSync(outArg).isDirectory()) {
 }
 
 await wb.xlsx.writeFile(outPath);
+commitSeq(db, client.id, year, seq);
 console.log(`Arbeitsrapport erstellt: ${path.resolve(outPath)} (${entries.length} Einträge)`);

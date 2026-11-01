@@ -4,6 +4,7 @@ import { buildArbeitsrapportWorkbook } from '../lib/buildArbeitsrapport.js';
 import { getUserTimezone, localDateKey, utcWindowForLocalRange, parseDateKey } from '../lib/timezone.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { normalizeRoundingRule } from '../lib/rounding.js';
+import { commitSeq, formatRapportNr, peekNextSeq, yearOfDateKey } from '../lib/rapportNumber.js';
 
 const router = Router();
 const uid = (req: Request) => (req as any).user.id as number;
@@ -54,6 +55,26 @@ function loadEntries(
   });
 }
 
+/**
+ * Nächste laufende Rapport-Nr. eines Kunden für das Jahr von `to` (Vorschau, verändert nichts).
+ * Der Zähler wird erst von POST /mark-billed fortgeschrieben.
+ */
+router.get('/next-number', (req: Request, res: Response) => {
+  const { to, clientId } = req.query;
+  if (!to || !clientId) {
+    return res.status(400).json({ error: 'errors.arbeitsrapport.paramsRequired' });
+  }
+  if (!parseDateKey(to)) {
+    return res.status(400).json({ error: 'errors.arbeitsrapport.invalidDateRange' });
+  }
+  const userId = uid(req);
+  const client = db.prepare('SELECT id FROM clients WHERE id = ? AND user_id = ?').get(Number(clientId), userId);
+  if (!client) return res.status(404).json({ error: 'errors.arbeitsrapport.clientNotFound' });
+
+  const year = yearOfDateKey(to as string);
+  res.json({ year, seq: peekNextSeq(db, Number(clientId), year) });
+});
+
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const { from, to, clientId, projektText, rapportNr, lang, projectIds, billable, billed } = req.query;
   if (!from || !to || !clientId) {
@@ -84,13 +105,15 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     tz,
   );
 
-  // Rapport-Nr. aus 'to' ableiten (Datumsstring direkt, ohne TZ-Drift); Datum = Erstellungsdatum (heute, in User-TZ)
-  const yyyymm = (to as string).slice(0, 7); // 'YYYY-MM'
+  // Datum = Erstellungsdatum (heute, in User-TZ)
   const [ty, tm, td] = localDateKey(new Date().toISOString(), tz).split('-');
   const datum = `${td}.${tm}.${ty}`;
 
-  const postfix = client.rapport_postfix != null ? `.${String(client.rapport_postfix).padStart(2, '0')}` : '';
-  const nr = (rapportNr as string) || `${yyyymm}${postfix}`;
+  // Rapport-Nr.: laufende Nummer pro Kunde und Jahr (Jahr aus 'to', ohne TZ-Drift).
+  // Fehlt die Nr. im Request, wird die nächste freie vorgeschlagen – der Zähler
+  // selbst wird erst in /mark-billed fortgeschrieben (GET bleibt zustandslos).
+  const nr = (rapportNr as string)
+    || formatRapportNr(yearOfDateKey(to as string), peekNextSeq(db, Number(clientId), yearOfDateKey(to as string)), client.rapport_postfix);
 
   const wb = buildArbeitsrapportWorkbook({
     entries,
@@ -117,13 +140,14 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 /**
- * Bestätigungs-Endpoint: markiert die Einträge eines Rapports als rapportiert.
+ * Bestätigungs-Endpoint: markiert die Einträge eines Rapports als rapportiert
+ * und schreibt die laufende Rapport-Nr. des Kunden fort.
  * Wird vom Frontend erst NACH erfolgreichem Empfang der Datei aufgerufen –
  * der GET-Download selbst verändert keinen Zustand mehr (Prefetch/Retry-sicher).
  * Gleiche Filter wie der Download, damit exakt dieselben Einträge markiert werden.
  */
 router.post('/mark-billed', (req: Request, res: Response) => {
-  const { from, to, clientId, projectIds, billable, billed } = req.body;
+  const { from, to, clientId, projectIds, billable, billed, rapportSeq } = req.body;
   if (!from || !to || !clientId) {
     return res.status(400).json({ error: 'errors.arbeitsrapport.paramsRequired' });
   }
@@ -147,6 +171,11 @@ router.post('/mark-billed', (req: Request, res: Response) => {
        WHERE user_id = ? AND billed_at IS NULL AND id IN (${toMark.map(() => '?').join(',')})`
     ).run(userId, ...toMark).changes as number;
   }
+
+  // Laufende Rapport-Nr. fortschreiben (auch wenn keine Einträge mehr zu markieren waren –
+  // der Rapport wurde trotzdem erstellt). Idempotent: der Zähler geht nie rückwärts.
+  commitSeq(db, Number(clientId), yearOfDateKey(to), rapportSeq != null ? Number(rapportSeq) : undefined);
+
   res.json({ marked });
 });
 

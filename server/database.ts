@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dataDir } from './lib/appPaths.js';
+import { ensureRapportCounterTable } from './lib/rapportNumber.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DB_PATH = path.join(dataDir, 'clockitnow.db');
@@ -131,6 +132,9 @@ export function initDatabase(): void {
       updated_at TEXT DEFAULT (datetime('now'))
     )
   `);
+
+  // Laufende Rapport-Nummer pro Kunde und Jahr (Arbeitsrapport)
+  ensureRapportCounterTable(db);
 
   // ── Additive Migrationen für bestehende Datenbanken ──────────────────────
   if (!hasColumn('time_entries', 'task_id'))

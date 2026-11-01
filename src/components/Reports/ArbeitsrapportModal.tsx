@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, FileSpreadsheet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n/config';
-import { downloadArbeitsrapport, markArbeitsrapportBilled } from '../../api';
+import { downloadArbeitsrapport, getNextRapportNumber, markArbeitsrapportBilled } from '../../api';
 import { translateError } from '../../i18n';
 import { downloadBlob } from '../../utils/downloadBlob';
 import type { Client } from '../../types';
@@ -26,13 +26,25 @@ export default function ArbeitsrapportModal({ clients, from, to, billable, bille
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const toDate = new Date(to);
-  const monthPart = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}`;
+  // Rapport-Nr. = <Jahr>-<laufende Nr. pro Kunde>[.<Postfix>]; Vorschlag vom Server, anpassbar
+  const year = to.slice(0, 4);
+  const [seq, setSeq] = useState<string>('');
+  const seqNum = Number(seq);
+  const seqValid = Number.isInteger(seqNum) && seqNum >= 1;
   const postfix = client?.rapport_postfix != null ? `.${String(client.rapport_postfix).padStart(2, '0')}` : '';
-  const rapportNr = `${monthPart}${postfix}`;
+  const rapportNr = `${year}-${seqValid ? String(seqNum).padStart(2, '0') : '??'}${postfix}`;
+
+  useEffect(() => {
+    if (!client) return;
+    let cancelled = false;
+    getNextRapportNumber({ to, clientId: client.id })
+      .then(r => { if (!cancelled) setSeq(String(r.seq)); })
+      .catch(e => { if (!cancelled) setError(translateError(t, e instanceof Error ? e.message : t('arbeitsrapport.createError'))); });
+    return () => { cancelled = true; };
+  }, [client?.id, to]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreate = async () => {
-    if (!client) return;
+    if (!client || !seqValid) return;
     setBusy(true);
     setError(null);
     try {
@@ -40,7 +52,7 @@ export default function ArbeitsrapportModal({ clients, from, to, billable, bille
       downloadBlob(blob, `Arbeitsrapport-${rapportNr} ${client.name}.xlsx`);
       // Erst nachdem die Datei vollständig angekommen ist als rapportiert markieren –
       // schlägt der Download fehl, bleibt der Abrechnungsstatus unverändert.
-      await markArbeitsrapportBilled({ from, to, clientId: client.id, projectIds, billable, billed });
+      await markArbeitsrapportBilled({ from, to, clientId: client.id, projectIds, billable, billed, rapportSeq: seqNum });
       onCreated?.();
       onClose();
     } catch (e) {
@@ -73,6 +85,12 @@ export default function ArbeitsrapportModal({ clients, from, to, billable, bille
                 placeholder={t('arbeitsrapport.projektPlaceholder')}
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent resize-none" />
             </div>
+            <div>
+              <label className="text-xs text-secondary mb-1.5 block">{t('arbeitsrapport.seqLabel', { year })}</label>
+              <input type="number" min={1} step={1} value={seq} onChange={e => setSeq(e.target.value)}
+                className="w-24 bg-background border border-border rounded-lg px-3 py-2 text-sm text-primary tabular-nums outline-none focus:border-accent" />
+              <p className="text-xs text-secondary mt-1.5">{t('arbeitsrapport.seqHelp')}</p>
+            </div>
             <div className="text-xs text-secondary">
               {t('arbeitsrapport.rapportNrLabel')} <span className="text-primary font-medium">{rapportNr}</span> · {t('arbeitsrapport.periodLabel')} {from} – {to}
             </div>
@@ -81,7 +99,7 @@ export default function ArbeitsrapportModal({ clients, from, to, billable, bille
         )}
         <div className="flex justify-end gap-3 px-5 py-4 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 text-sm text-secondary hover:text-primary">{t('common.cancel')}</button>
-          <button onClick={handleCreate} disabled={busy || invalidSelection}
+          <button onClick={handleCreate} disabled={busy || invalidSelection || !seqValid}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg disabled:opacity-50">
             <FileSpreadsheet size={15} /> {busy ? t('arbeitsrapport.creating') : t('arbeitsrapport.createXlsx')}
           </button>
